@@ -1,0 +1,39 @@
+# ─── macOS ───────────────────────────────────────────────
+.DS_Store
+
+# ─── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Virtual environments ───────────────────────────────
+.venv/
+venv/
+env/
+
+# ─── IDE / editor ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ─── Claude Code local settings ─────────────────────────
+.claude/
+
+# ─── Tools Hub launcher state / logs ────────────────────
+.hub_logs/
+
+# ─── fordeveloper runtime data (DB, logs, secrets) ──────
+fordeveloper/data/
+fordeveloper/com.odeal.fordeveloper.plist
+fordeveloper/*.pid
+
+# ─── clipboard-keeper runtime logs ──────────────────────
+clipboard-keeper/launchd.out.log
+clipboard-keeper/launchd.err.log
+
+# ─── tools-hub runtime ──────────────────────────────────
+tools-hub/.state/

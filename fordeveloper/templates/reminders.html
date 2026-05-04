@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Reminders{% endblock %}
+{% block page_title %}Reminders & Jobs{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <button class="btn btn-primary" onclick="openReminderModal()">+ Yeni Hatirlatma</button>
+    <div class="filter-tabs">
+        <a href="/reminders?status=active" class="tab {% if status_filter == 'active' %}active{% endif %}">Aktif</a>
+        <a href="/reminders?status=done" class="tab {% if status_filter == 'done' %}active{% endif %}">Tamamlandi</a>
+        <a href="/reminders?status=cancelled" class="tab {% if status_filter == 'cancelled' %}active{% endif %}">Iptal</a>
+        <a href="/reminders?status=all" class="tab {% if status_filter == 'all' %}active{% endif %}">Tumu</a>
+    </div>
+</div>
+
+<div class="reminder-cards">
+    {% for r in reminders %}
+    <div class="card reminder-card {% if r.status != 'active' %}reminder-inactive{% endif %}">
+        <div class="reminder-card-top">
+            <span class="badge badge-{{ r.category }}">{{ r.category }}</span>
+            <span class="badge badge-{{ r.status }}">{{ r.status }}</span>
+            <span class="priority-dot priority-{{ r.priority }}" title="{{ r.priority }}"></span>
+        </div>
+        <div class="reminder-card-note">{{ r.note }}</div>
+        <div class="reminder-card-meta">
+            <span class="reminder-card-time">{{ r.remind_at.strftime('%d/%m/%Y %H:%M') }}</span>
+            {% if r.recurrence != 'once' %}
+            <span class="badge badge-recurrence">{{ r.recurrence }}</span>
+            {% endif %}
+            {% if r.related_task %}
+            <a href="/search?q={{ r.related_task.tco_number or r.related_task.title }}" class="reminder-task-link">{{ r.related_task.title[:30] }}</a>
+            {% endif %}
+        </div>
+        <div class="reminder-card-actions">
+            {% if r.status == 'active' %}
+            <button class="btn btn-sm btn-success" onclick="updateReminderStatus({{ r.id }}, 'done')">Tamamla</button>
+            <button class="btn btn-sm btn-ghost" onclick="updateReminderStatus({{ r.id }}, 'cancelled')">Iptal</button>
+            {% elif r.status != 'active' %}
+            <button class="btn btn-sm btn-ghost" onclick="updateReminderStatus({{ r.id }}, 'active')">Tekrar Aktif Et</button>
+            {% endif %}
+            <button class="btn btn-sm btn-ghost" onclick="editReminder({{ r.to_dict()|tojson|e }})">Duzenle</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteReminder({{ r.id }})">Sil</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not reminders %}
+<div class="empty-state-large">
+    <p>Hatirlatma bulunamadi.</p>
+</div>
+{% endif %}
+
+<!-- Reminder Modal -->
+<div class="modal" id="reminderModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="reminderModalTitle">Yeni Hatirlatma</h3>
+            <button class="modal-close" onclick="closeModal('reminderModal')">&times;</button>
+        </div>
+        <form onsubmit="saveReminder(event)">
+            <input type="hidden" id="rm_id" value="">
+            <div class="form-group">
+                <label>Not</label>
+                <textarea id="rm_note" class="form-input" rows="3" required placeholder="Hatirlatma notu..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tarih & Saat</label>
+                    <input type="datetime-local" id="rm_remind_at" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="rm_category" class="form-input">
+                        <option value="genel">Genel</option>
+                        <option value="deployment">Deployment</option>
+                        <option value="task">Task</option>
+                        <option value="review">Review</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="daily">Daily</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tekrar</label>
+                    <select id="rm_recurrence" class="form-input">
+                        <option value="once">Bir Kez</option>
+                        <option value="daily">Her Gun</option>
+                        <option value="weekdays">Hafta Ici</option>
+                        <option value="tue_thu">Sali & Persembe</option>
+                        <option value="weekly">Haftalik</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Oncelik</label>
+                    <select id="rm_priority" class="form-input">
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Iliskili Task (Opsiyonel)</label>
+                <select id="rm_related_task_id" class="form-input">
+                    <option value="">-- Yok --</option>
+                    {% for t in all_tasks %}
+                    <option value="{{ t.id }}">{{ t.tco_number }} - {{ t.title[:40] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

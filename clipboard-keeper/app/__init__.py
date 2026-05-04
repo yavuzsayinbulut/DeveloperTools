@@ -1,0 +1,1 @@
+"""Clipboard Keeper Pro package."""

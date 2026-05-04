@@ -1,0 +1,50 @@
+Tools Hub - Plan ve Devam Notlari
+=================================
+
+Amac
+----
+Tools klasoru icindeki uygulamalari tek yerden gosteren, baslatan ve
+yoneten bir cati uygulama hazirlamak.
+
+Hedefler
+--------
+- Alt klasorleri tarayip uygulama gibi davranan projeleri bulmak
+- Her uygulama icin isim, tip, path, URL ve start yontemini gostermek
+- Start / Stop / Open URL / Open Folder / Open Logs islemleri sunmak
+- URL bilgisini duzenlenebilir sekilde saklamak
+- Profesyonel ama sade bir masaustu arayuz sunmak
+- Root klasorde `start.command` ile launcher'i acmak
+
+Akilli Ozellikler
+-----------------
+- Otomatik uygulama kesfi
+- URL saglik kontrolu
+- Son baslatma zamani takibi
+- Surec PID takibi
+- Log dosyasi onizlemesi
+- Klasor yeniden tarama
+
+Mimari
+------
+- Dil: Python 3
+- UI: PySide6
+- Durum saklama: JSON
+- Surec baslatma: subprocess + detached session
+- Desteklenen tespitler:
+  - start.command
+  - Python app.py
+  - Python main.py
+  - package.json
+
+Ilerleme
+--------
+[x] Mevcut iki uygulama tespit edildi
+[x] fordeveloper icin start/stop scriptleri eklendi
+[x] tools-hub uygulamasi yazildi
+[x] root start.command / stop.command yazildi
+[x] smoke test yapildi
+
+Devam Notu
+----------
+Eger calisma yarida kalirsa once bu dosyaya, sonra `tools-hub/README_TR.md`
+ve `tools-hub/main.py` dosyasina bak.

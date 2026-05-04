@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}{{ fd.task }} - {{ fd.title }}{% endblock %}
+{% block page_title %}Deployment Detay{% endblock %}
+
+{% block content %}
+<div class="detail-nav">
+    {% if fd.status == 'bekliyor' %}
+    <a href="/upcoming-deployments" class="btn btn-ghost btn-sm">&larr; Gelecek Deploymentlar</a>
+    {% else %}
+    <a href="/deployments" class="btn btn-ghost btn-sm">&larr; Son Deploymentlar</a>
+    {% endif %}
+</div>
+
+<div class="card detail-card">
+    <div class="detail-header">
+        <div class="detail-top">
+            <span class="deploy-card-date">{{ fd.date }}</span>
+            <span class="badge badge-fd-{{ fd.status }}">{{ 'Bekliyor' if fd.status == 'bekliyor' else 'Tamamlandi' }}</span>
+            {% if fd.task %}
+            <span class="badge badge-task clickable-copy" data-copy="{{ fd.task }}" title="Tikla: TCO kopyala">{{ fd.task }}</span>
+            {% endif %}
+        </div>
+        <h2 class="detail-title">{{ fd.title }}</h2>
+    </div>
+
+    <div class="detail-actions">
+        {% if fd.status == 'bekliyor' %}
+        <button class="btn btn-success" onclick="completeFd({{ fd.id }})">Tamamlandi Olarak Isaretle</button>
+        {% else %}
+        <button class="btn btn-ghost" onclick="revertFd({{ fd.id }})">Bekliyora Geri Al</button>
+        {% endif %}
+        <button class="btn btn-ghost" onclick="copyFdMarkdown({{ fd.id }})">Markdown Kopyala</button>
+        <button class="btn btn-ghost" onclick='editFd({{ fd.id }}, {{ fd.to_dict()|tojson }})'>Duzenle</button>
+        <button class="btn btn-icon btn-danger" onclick="deleteFd({{ fd.id }})" title="Sil">&times;</button>
+    </div>
+
+    {% if fd.jira_url %}
+    <div class="detail-section">
+        <span class="detail-label">JIRA</span>
+        <a href="{{ fd.jira_url }}" target="_blank" class="deploy-link jira-link">{{ fd.jira_url }} &nearr;</a>
+    </div>
+    {% endif %}
+
+    {% if fd.summary %}
+    <div class="detail-section">
+        <span class="detail-label">Ozet</span>
+        <p class="detail-text">{{ fd.summary }}</p>
+    </div>
+    {% endif %}
+
+    {% if fd.contacts %}
+    <div class="detail-section">
+        <span class="detail-label">Ilgililer</span>
+        <div class="deploy-contacts">
+            {% for c in fd.contacts.split(',') if c.strip() %}
+            <span class="badge badge-contact">{{ c.strip() }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if fd.repos %}
+    <div class="detail-section">
+        <span class="detail-label">Repolar</span>
+        <div class="deploy-repos">
+            {% for repo in fd.repos %}
+            <div class="repo-block">
+                <div class="repo-name">{{ repo.name }}</div>
+                <div class="repo-details">
+                    {% if repo.mr_url %}
+                    <a href="{{ repo.mr_url }}" target="_blank" class="deploy-link mr-link">MR &nearr;</a>
+                    {% endif %}
+                    {% if repo.branch and repo.branch != 'Bilinmiyor' %}
+                    <span class="repo-meta">Branch: <code>{{ repo.branch }}</code></span>
+                    {% endif %}
+                    {% if repo.commit and repo.commit != 'Bilinmiyor' %}
+                    <span class="repo-meta">Commit: <code>{{ repo.commit }}</code></span>
+                    {% endif %}
+                    {% if repo.test_merge %}
+                    <span class="badge badge-merge-{{ repo.test_merge|lower|replace(' ', '-')|replace('i', 'i') }}">
+                        Test: {{ repo.test_merge }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if repo.detail %}
+                <p class="repo-detail">{{ repo.detail }}</p>
+                {% endif %}
+                {% if repo.test_note %}
+                <p class="repo-test-note"><em>{{ repo.test_note }}</em></p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if fd.task %}
+    <div class="detail-section">
+        <a href="/search?q={{ fd.task }}" class="btn btn-primary btn-sm">{{ fd.task }} - Tum task kayitlarini gor &rarr;</a>
+    </div>
+    {% endif %}
+
+    <div class="detail-meta">
+        <span>Olusturulma: {{ fd.created_at.strftime('%d/%m/%Y %H:%M') if fd.created_at else '-' }}</span>
+        {% if fd.completed_at %}
+        <span>Tamamlanma: {{ fd.completed_at.strftime('%d/%m/%Y %H:%M') }}</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Edit Modal (reuse from upcoming page) -->
+<div class="modal" id="fdModal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="fdModalTitle">Deployment Duzenle</h3>
+            <button class="modal-close" onclick="closeModal('fdModal')">&times;</button>
+        </div>
+        <form onsubmit="saveFdDetail(event)">
+            <input type="hidden" id="fd_id" value="">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tarih</label>
+                    <input type="date" id="fd_date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>TCO Numarasi</label>
+                    <input type="text" id="fd_task" class="form-input" placeholder="TCO-XXXX">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Baslik</label>
+                <input type="text" id="fd_title" class="form-input" required placeholder="Deployment basligi...">
+            </div>
+            <div class="form-group">
+                <label>JIRA URL</label>
+                <input type="url" id="fd_jira_url" class="form-input" placeholder="https://odeal.atlassian.net/browse/TCO-XXXX">
+            </div>
+            <div class="form-group">
+                <label>Ozet</label>
+                <input type="text" id="fd_summary" class="form-input" placeholder="Kisa ozet...">
+            </div>
+            <div class="form-group">
+                <label>Ilgililer (virgul ile ayirin)</label>
+                <input type="text" id="fd_contacts" class="form-input" placeholder="Kisi1, Kisi2">
+            </div>
+            <div class="form-group">
+                <label>Repolar</label>
+                <div id="fd_repos_container"></div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="addRepoRow()" style="margin-top: 8px;">+ Repo Ekle</button>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+                <button type="button" class="btn btn-ghost" onclick="closeModal('fdModal')">Iptal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function saveFdDetail(e) {
+    e.preventDefault();
+    const id = document.getElementById('fd_id').value;
+    const task = document.getElementById('fd_task').value.trim();
+    const data = {
+        date: document.getElementById('fd_date').value,
+        task: task,
+        title: document.getElementById('fd_title').value,
+        jira_url: document.getElementById('fd_jira_url').value || (task ? 'https://odeal.atlassian.net/browse/' + task : ''),
+        summary: document.getElementById('fd_summary').value,
+        contacts: document.getElementById('fd_contacts').value,
+        repos: collectRepos(),
+    };
+    await apiPut('/api/future-deployments/' + id, data);
+    showToast('Deployment guncellendi');
+    closeModal('fdModal');
+    setTimeout(() => location.reload(), 500);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Gelecek Deploymentlar{% endblock %}
+{% block page_title %}Gelecek Deploymentlar{% endblock %}
+
+{% block content %}
+{% if is_deploy_today %}
+<div class="alert alert-warning">Bugun Deployment Gunu!</div>
+{% endif %}
+
+<div class="toolbar">
+    <button class="btn btn-primary" onclick="openFdModal()">+ Yeni Deployment</button>
+    <span class="toolbar-info">{{ deployments|length }} bekleyen &middot; {{ completed|length }} tamamlanan</span>
+</div>
+
+<div class="deploy-kanban">
+    <!-- Bekliyor Column -->
+    <div class="deploy-kanban-col">
+        <div class="deploy-kanban-header">
+            <span class="deploy-kanban-title">Bekliyor</span>
+            <span class="kanban-count">{{ deployments|length }}</span>
+        </div>
+        <div class="deploy-kanban-cards" id="colBekliyor" ondragover="onDragOver(event)" ondrop="onDrop(event, 'bekliyor')">
+            {% for fd in deployments %}
+            <div class="deploy-kanban-card" draggable="true" ondragstart="onDragStart(event, {{ fd.id }})" id="dcard-{{ fd.id }}">
+                <div class="dkc-top">
+                    <span class="deploy-card-date">{{ fd.date }}</span>
+                    {% if fd.task %}
+                    <span class="badge badge-task clickable-copy" data-copy="{{ fd.task }}">{{ fd.task }}</span>
+                    {% endif %}
+                </div>
+                <a href="/deployment/{{ fd.id }}" class="dkc-title">{{ fd.title }}</a>
+                {% if fd.summary %}
+                <p class="dkc-summary">{{ fd.summary[:80] }}</p>
+                {% endif %}
+                {% if fd.repos %}
+                <div class="dkc-repos">
+                    {% for repo in fd.repos %}
+                    <span class="dkc-repo">{{ repo.name.split('/')[-1] }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="dkc-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="copyFdMarkdown({{ fd.id }})">Kopyala</button>
+                    <button class="btn btn-ghost btn-sm" onclick='editFd({{ fd.id }}, {{ fd.to_dict()|tojson }})'>Duzenle</button>
+                    {% if fd.jira_url %}
+                    <a href="{{ fd.jira_url }}" target="_blank" class="btn btn-ghost btn-sm">JIRA</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% if not deployments %}
+            <div class="dkc-empty">Bekleyen deployment yok</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tamamlandi Column -->
+    <div class="deploy-kanban-col deploy-kanban-col-done">
+        <div class="deploy-kanban-header">
+            <span class="deploy-kanban-title">Tamamlandi</span>
+            <span class="kanban-count">{{ completed|length }}</span>
+        </div>
+        <div class="deploy-kanban-cards" id="colTamamlandi" ondragover="onDragOver(event)" ondrop="onDrop(event, 'tamamlandi')">
+            {% for fd in completed %}
+            <div class="deploy-kanban-card dkc-done" draggable="true" ondragstart="onDragStart(event, {{ fd.id }})" id="dcard-{{ fd.id }}">
+                <div class="dkc-top">
+                    <span class="deploy-card-date">{{ fd.date }}</span>
+                    {% if fd.task %}
+                    <span class="badge badge-task clickable-copy" data-copy="{{ fd.task }}">{{ fd.task }}</span>
+                    {% endif %}
+                </div>
+                <a href="/deployment/{{ fd.id }}" class="dkc-title">{{ fd.title }}</a>
+                {% if fd.summary %}
+                <p class="dkc-summary">{{ fd.summary[:80] }}</p>
+                {% endif %}
+                <div class="dkc-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="copyFdMarkdown({{ fd.id }})">Kopyala</button>
+                    {% if fd.jira_url %}
+                    <a href="{{ fd.jira_url }}" target="_blank" class="btn btn-ghost btn-sm">JIRA</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% if not completed %}
+            <div class="dkc-empty">Buraya surukleyerek tamamla</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal" id="fdModal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="fdModalTitle">Yeni Deployment</h3>
+            <button class="modal-close" onclick="closeModal('fdModal')">&times;</button>
+        </div>
+        <form onsubmit="saveFd(event)">
+            <input type="hidden" id="fd_id" value="">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tarih</label>
+                    <input type="date" id="fd_date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>TCO Numarasi</label>
+                    <input type="text" id="fd_task" class="form-input" placeholder="TCO-XXXX">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Baslik</label>
+                <input type="text" id="fd_title" class="form-input" required placeholder="Deployment basligi...">
+            </div>
+            <div class="form-group">
+                <label>JIRA URL</label>
+                <input type="url" id="fd_jira_url" class="form-input" placeholder="https://odeal.atlassian.net/browse/TCO-XXXX">
+            </div>
+            <div class="form-group">
+                <label>Ozet</label>
+                <input type="text" id="fd_summary" class="form-input" placeholder="Kisa ozet...">
+            </div>
+            <div class="form-group">
+                <label>Ilgililer (virgul ile ayirin)</label>
+                <input type="text" id="fd_contacts" class="form-input" placeholder="Kisi1, Kisi2">
+            </div>
+            <div class="form-group">
+                <label>Repolar</label>
+                <div id="fd_repos_container"></div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="addRepoRow()" style="margin-top: 8px;">+ Repo Ekle</button>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+                <button type="button" class="btn btn-ghost" onclick="closeModal('fdModal')">Iptal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let dragId = null;
+
+function onDragStart(e, id) {
+    dragId = id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dkc-dragging');
+}
+
+function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('deploy-kanban-drop');
+}
+
+document.addEventListener('dragend', function() {
+    document.querySelectorAll('.dkc-dragging').forEach(el => el.classList.remove('dkc-dragging'));
+    document.querySelectorAll('.deploy-kanban-drop').forEach(el => el.classList.remove('deploy-kanban-drop'));
+});
+
+document.addEventListener('dragleave', function(e) {
+    if (e.target.classList) e.target.classList.remove('deploy-kanban-drop');
+});
+
+function onDrop(e, newStatus) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('deploy-kanban-drop');
+    if (!dragId) return;
+    apiPut('/api/future-deployments/' + dragId, { status: newStatus }).then(() => {
+        showToast(newStatus === 'tamamlandi' ? 'Deployment tamamlandi!' : 'Bekliyora geri alindi');
+        setTimeout(() => location.reload(), 400);
+    });
+    dragId = null;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Team Pulse{% endblock %}
+{% block page_title %}Team Pulse{% endblock %}
+
+{% block content %}
+<div class="team-pulse-hero">
+    <div>
+        <h2>Git Hareket Analizi</h2>
+        <p>Commit, PR/merge, repo yogunlugu ve kisi bazli hareketi tek ekranda izle.</p>
+    </div>
+    <button class="btn btn-primary" onclick="loadTeamPulsePage(true)">Yenile</button>
+</div>
+
+<div class="team-pulse-summary" id="teamPulseSummary">
+    <div class="status-card"><div class="status-info"><span class="status-label">Yukleniyor</span><span class="status-value">...</span></div></div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3>Top Contributors</h3>
+        </div>
+        <div id="teamPulseContributors">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Repo Heat</h3>
+        </div>
+        <div id="teamPulseRepos">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent PR / Merge</h3>
+        </div>
+        <div id="teamPulsePRs">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3>Recent Commits</h3>
+        </div>
+        <div id="teamPulseCommits">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => loadTeamPulsePage(false));
+</script>
+{% endblock %}

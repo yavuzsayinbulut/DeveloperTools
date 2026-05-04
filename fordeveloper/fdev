@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# fordeveloper service control
+# Usage: ./fdev {start|stop|restart|status|run|log|err|tail|agent-install|agent-uninstall}
+#
+# Default start/stop runs as a nohup daemon from your terminal session.
+# This works around macOS TCC (Privacy) limits that block launchd from
+# reading files under ~/Desktop. Use 'agent-install' if the project lives
+# outside ~/Desktop OR Python has Full Disk Access.
+
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLIST_NAME="com.odeal.fordeveloper.plist"
+PLIST_SRC="$ROOT/$PLIST_NAME"
+PLIST_DST="$HOME/Library/LaunchAgents/$PLIST_NAME"
+LABEL="com.odeal.fordeveloper"
+PORT="5555"
+PY="$ROOT/venv/bin/python"
+APP="$ROOT/app.py"
+LOG_DIR="$ROOT/data"
+PID_FILE="$LOG_DIR/fdev.pid"
+APP_LOG="$LOG_DIR/app.log"
+ERR_LOG="$LOG_DIR/error.log"
+
+c_g="\033[32m"; c_r="\033[31m"; c_y="\033[33m"; c_b="\033[34m"; c_d="\033[2m"; c_0="\033[0m"
+
+is_loaded() { launchctl list 2>/dev/null | awk '{print $3}' | grep -qx "$LABEL"; }
+port_pid()  { lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1; }
+pid_alive() { local p="${1:-}"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
+
+read_pid() {
+    [ -f "$PID_FILE" ] || return 1
+    local p; p="$(cat "$PID_FILE" 2>/dev/null)"
+    pid_alive "$p" || return 1
+    echo "$p"
+}
+
+render_plist() {
+    cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$PY</string>
+        <string>$APP</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>$ROOT</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>$APP_LOG</string>
+    <key>StandardErrorPath</key>
+    <string>$ERR_LOG</string>
+</dict>
+</plist>
+EOF
+}
+
+sync_plist() {
+    mkdir -p "$LOG_DIR"
+    local desired; desired="$(render_plist)"
+    if [ ! -f "$PLIST_SRC" ] || [ "$(cat "$PLIST_SRC" 2>/dev/null)" != "$desired" ]; then
+        printf '%s\n' "$desired" > "$PLIST_SRC"
+    fi
+    if [ -f "$PLIST_DST" ] && [ "$(cat "$PLIST_DST" 2>/dev/null)" != "$desired" ]; then
+        if is_loaded; then launchctl unload "$PLIST_DST" 2>/dev/null || true; fi
+        printf '%s\n' "$desired" > "$PLIST_DST"
+    fi
+}
+
+stop_agent_if_loaded() {
+    if is_loaded && [ -f "$PLIST_DST" ]; then
+        launchctl unload "$PLIST_DST" 2>/dev/null || true
+    fi
+}
+
+cmd_start() {
+    sync_plist
+    if [ ! -x "$PY" ]; then
+        echo -e "${c_r}venv python not found:${c_0} $PY"
+        echo "  setup: cd $ROOT && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt"
+        return 1
+    fi
+
+    # If LaunchAgent variant is owning the port, prefer to leave it; warn.
+    stop_agent_if_loaded
+
+    local existing; existing="$(read_pid || true)"
+    if [ -n "${existing:-}" ]; then
+        echo -e "${c_y}already running${c_0} (pid $existing)"
+        cmd_status; return 0
+    fi
+    local ppid; ppid="$(port_pid || true)"
+    if [ -n "${ppid:-}" ]; then
+        echo -e "${c_y}port $PORT busy by pid $ppid - killing${c_0}"
+        kill "$ppid" 2>/dev/null || true; sleep 1
+        ppid="$(port_pid || true)"
+        [ -n "${ppid:-}" ] && kill -9 "$ppid" 2>/dev/null || true
+    fi
+
+    mkdir -p "$LOG_DIR"
+    echo -e "${c_b}starting daemon ...${c_0}"
+    # Detach from terminal so it survives shell exit
+    ( cd "$ROOT" && nohup "$PY" "$APP" >>"$APP_LOG" 2>>"$ERR_LOG" </dev/null & echo $! >"$PID_FILE" ) >/dev/null 2>&1
+    disown 2>/dev/null || true
+    sleep 2
+    cmd_status
+}
+
+cmd_stop() {
+    stop_agent_if_loaded
+    local p; p="$(read_pid || true)"
+    if [ -n "${p:-}" ]; then
+        echo -e "${c_y}killing pid $p${c_0}"
+        kill "$p" 2>/dev/null || true
+        for _ in 1 2 3 4 5; do pid_alive "$p" || break; sleep 0.5; done
+        pid_alive "$p" && kill -9 "$p" 2>/dev/null || true
+    fi
+    rm -f "$PID_FILE"
+    local ppid; ppid="$(port_pid || true)"
+    if [ -n "${ppid:-}" ]; then
+        echo -e "${c_y}freeing port $PORT (pid $ppid)${c_0}"
+        kill "$ppid" 2>/dev/null || true; sleep 1
+        ppid="$(port_pid || true)"
+        [ -n "${ppid:-}" ] && kill -9 "$ppid" 2>/dev/null || true
+    fi
+    echo -e "${c_g}stopped${c_0}"
+}
+
+cmd_restart() { cmd_stop; sleep 1; cmd_start; }
+
+cmd_status() {
+    echo -e "${c_b}== fordeveloper status ==${c_0}"
+    local p; p="$(read_pid || true)"
+    if [ -n "${p:-}" ]; then
+        echo -e "  daemon: ${c_g}running${c_0} pid=$p"
+    else
+        echo -e "  daemon: ${c_d}stopped${c_0}"
+    fi
+
+    if is_loaded; then
+        local line; line="$(launchctl list | awk -v l="$LABEL" '$3==l {print}')"
+        local apid; apid="$(echo "$line" | awk '{print $1}')"
+        local ec;   ec="$(echo "$line"   | awk '{print $2}')"
+        if [ "$apid" != "-" ] && [ -n "$apid" ]; then
+            echo -e "  agent : ${c_g}running${c_0} pid=$apid"
+        else
+            echo -e "  agent : ${c_r}loaded but not running${c_0} last_exit=$ec"
+        fi
+    else
+        echo -e "  agent : ${c_d}not loaded${c_0}"
+    fi
+
+    local ppid; ppid="$(port_pid || true)"
+    if [ -n "${ppid:-}" ]; then
+        echo -e "  port  : ${c_g}listening${c_0} on $PORT (pid $ppid)"
+        echo -e "  url   : http://127.0.0.1:$PORT"
+    else
+        echo -e "  port  : ${c_r}closed${c_0} ($PORT)"
+    fi
+}
+
+cmd_run() {
+    if [ ! -x "$PY" ]; then echo -e "${c_r}venv python not found:${c_0} $PY"; return 1; fi
+    local ppid; ppid="$(port_pid || true)"
+    if [ -n "${ppid:-}" ]; then
+        echo -e "${c_y}port $PORT already in use by pid $ppid - stop first${c_0}"; return 1
+    fi
+    echo -e "${c_b}foreground run (Ctrl+C to stop)${c_0}"
+    cd "$ROOT" && exec "$PY" "$APP"
+}
+
+cmd_log()  { tail -n 100 -f "$APP_LOG"; }
+cmd_err()  { tail -n 100 -f "$ERR_LOG"; }
+cmd_tail() { tail -n 50 -f "$APP_LOG" "$ERR_LOG"; }
+
+cmd_agent_install() {
+    sync_plist
+    [ -f "$PLIST_DST" ] || cp "$PLIST_SRC" "$PLIST_DST"
+    if is_loaded; then launchctl unload "$PLIST_DST" 2>/dev/null || true; fi
+    launchctl load -w "$PLIST_DST"
+    sleep 1
+    cmd_status
+    echo
+    echo -e "${c_y}note:${c_0} if agent fails with exit 78, macOS TCC is blocking launchd"
+    echo "      from reading ~/Desktop. Either move the project outside ~/Desktop"
+    echo "      or grant Full Disk Access to: $PY"
+}
+
+cmd_agent_uninstall() {
+    if [ -f "$PLIST_DST" ]; then
+        launchctl unload "$PLIST_DST" 2>/dev/null || true
+        rm -f "$PLIST_DST"
+        echo -e "${c_g}LaunchAgent uninstalled${c_0}"
+    else
+        echo -e "${c_d}LaunchAgent was not installed${c_0}"
+    fi
+}
+
+cmd_help() {
+    cat <<EOF
+fdev - fordeveloper service control
+
+Usage: ./fdev <command>
+
+  start              Daemon olarak baslat (nohup, terminal kapansa da yasar)
+  stop               Daemon'i durdur ve port $PORT'u serbest birak
+  restart            stop + start
+  status             Durum (default)
+  run                Foreground'da calistir (debug, Ctrl+C ile durur)
+  log                data/app.log canli takip
+  err                data/error.log canli takip
+  tail               Hem app hem error log birlikte
+
+  agent-install      LaunchAgent'i yukle (login'de otomatik baslar)
+                     Not: ~/Desktop altinda macOS TCC izni nedeniyle calismaz
+  agent-uninstall    LaunchAgent'i kaldir
+
+Path : $ROOT
+URL  : http://127.0.0.1:$PORT
+EOF
+}
+
+case "${1:-status}" in
+    start)            cmd_start ;;
+    stop)             cmd_stop ;;
+    restart)          cmd_restart ;;
+    status|"")        cmd_status ;;
+    run|fg)           cmd_run ;;
+    log)              cmd_log ;;
+    err)              cmd_err ;;
+    tail)             cmd_tail ;;
+    agent-install)    cmd_agent_install ;;
+    agent-uninstall)  cmd_agent_uninstall ;;
+    -h|--help|help)   cmd_help ;;
+    *) echo "unknown: $1"; cmd_help; exit 1 ;;
+esac

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Docs{% endblock %}
+{% block page_title %}Docs Browser{% endblock %}
+
+{% block head %}
+<style>{{ pygments_css | safe }}</style>
+{% endblock %}
+
+{% block content %}
+<div class="docs-layout">
+    <div class="docs-sidebar">
+        <div class="docs-filter">
+            <input type="text" id="docsFilter" class="form-input" placeholder="Dosya filtrele..." oninput="filterDocs(this.value)">
+        </div>
+        <div class="docs-tree" id="docsTree">
+            {% for f in files %}
+            <a href="/docs?path={{ f.rel_path }}"
+               class="docs-file {% if selected == f.rel_path %}active{% endif %}"
+               data-name="{{ f.name|lower }}" data-path="{{ f.rel_path|lower }}">
+                <span class="docs-cat-dot" style="background:{{ category_colors.get(f.category, '#6b7280') }}" title="{{ category_labels.get(f.category, f.category) }}"></span>
+                <span class="docs-file-name">{{ f.name }}</span>
+                <span class="docs-file-dir">{{ f.dir }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="docs-content">
+        {% if selected_file %}
+        <div class="docs-scan-overlay" id="docsScanOverlay">
+            <div class="docs-scan-label">SCANNING {{ selected_file.name }}</div>
+            <div class="docs-scan-line"></div>
+        </div>
+        <div class="docs-content-header">
+            <h2>{{ selected_file.name }}</h2>
+            <span class="badge" style="background:{{ category_colors.get(selected_file.category, '#6b7280') }}">{{ category_labels.get(selected_file.category, selected_file.category) }}</span>
+            <span class="docs-path">{{ selected_file.rel_path }}</span>
+            {% if selected_file.tco_numbers %}
+            <div class="docs-tcos">
+                {% for tco in selected_file.tco_numbers.split(',') %}
+                {% if tco.strip() %}
+                <a href="/search?q={{ tco.strip() }}" class="tco-tag">{{ tco.strip() }}</a>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% if toc_html %}
+        <details class="docs-toc">
+            <summary>Icindekiler</summary>
+            {{ toc_html | safe }}
+        </details>
+        {% endif %}
+        <div class="docs-rendered md-body">
+            {{ content_html | safe }}
+        </div>
+        {% else %}
+        <div class="empty-state-large">
+            <p>Sol panelden bir dosya sec.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterDocs(val) {
+    val = val.toLowerCase();
+    document.querySelectorAll('.docs-file').forEach(el => {
+        const name = el.dataset.name;
+        const path = el.dataset.path;
+        el.style.display = (name.includes(val) || path.includes(val)) ? '' : 'none';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('docsScanOverlay');
+    if (!overlay) return;
+    const anim = window.YS_ANIM || {};
+    if (!anim.docs_scan || anim.pageOff) {
+        overlay.remove();
+        return;
+    }
+    requestAnimationFrame(() => overlay.classList.add('active'));
+    setTimeout(() => overlay.classList.add('done'), 900);
+    setTimeout(() => overlay.remove(), 1600);
+});
+</script>
+{% endblock %}

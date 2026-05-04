@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - YS Dev Notes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-body">
+    <div class="login-bg" id="loginBg"></div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">YS</div>
+            <h2 class="login-title">Dev Notes</h2>
+            <p class="login-subtitle">Authenticated Access Required</p>
+
+            {% if error %}
+            <div class="login-error">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="/login" id="loginForm">
+                <div class="login-pin-wrap">
+                    <input type="password" name="pin" id="pinInput" class="login-pin-input"
+                        maxlength="20" placeholder="PIN" autofocus autocomplete="off">
+                </div>
+                <button type="submit" class="btn btn-primary login-btn">Giris</button>
+            </form>
+
+            <div class="login-meta">
+                <span class="login-machine" id="machineStatus"></span>
+            </div>
+
+            <div class="login-footer">
+                <span class="login-encrypted">AES-256 encrypted</span>
+                <span class="login-sep">&middot;</span>
+                <span class="login-bound">machine-bound</span>
+                <span class="login-sep">&middot;</span>
+                <span>made by <span class="splash-author">feanor</span></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Mini matrix bg
+    (function() {
+        const canvas = document.getElementById('loginBg');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const fontSize = 12;
+        const cols = Math.floor(canvas.width / fontSize);
+        const drops = Array(cols).fill(1);
+        const chars = '01';
+
+        function draw() {
+            ctx.fillStyle = 'rgba(10, 12, 16, 0.06)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.15)';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const ch = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(ch, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.98) drops[i] = 0;
+                drops[i]++;
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    })();
+
+    // Focus pin input
+    document.getElementById('pinInput').focus();
+
+    // Machine status indicator
+    const ms = document.getElementById('machineStatus');
+    ms.textContent = 'Machine verified';
+    ms.style.color = '#00ff41';
+    </script>
+</body>
+</html>

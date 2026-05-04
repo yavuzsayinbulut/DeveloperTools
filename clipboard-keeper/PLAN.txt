@@ -1,0 +1,62 @@
+Clipboard Keeper Pro - Plan ve Devam Notlari
+============================================
+
+Proje Amaci
+-----------
+macOS icin basit, sade ama profesyonel gorunumlu bir pano yoneticisi yapmak.
+Uygulama menubar simgesiyle calisacak, son kopyalananlari tutacak, pinleme,
+sekmeli duzenleme, TXT export, ayarlanabilir "show all" ve acilista calisma
+destegi sunacak.
+
+Ana Ozellikler
+--------------
+- Menubar ikonlu masaustu uygulamasi
+- Kopyalanan verileri yerelde saklama
+- Pinlenmis veriler + son 10 kayit gorunumu
+- "Show all" ile ayarlardan belirlenen gun kadar gecmisi kaydirarak gorme
+- Uzun iceriklerde hover tooltip/popup
+- Birden fazla sekmede acma, duzenleme ve kapatma
+- TXT export: bolumlu kayit alma
+- Her zaman ustte tutma
+- Acilista baslatma
+- `clipboard-keeper` klasorunde `start.command`
+
+Mimari Karar
+------------
+- Dil: Python 3
+- Arayuz: PySide6
+- Menubar / tray: QSystemTrayIcon
+- Veri saklama: JSON dosyasi
+- Baslangic: launchd LaunchAgent
+- Istege bagli Dock gizleme: pyobjc Cocoa bridge
+
+Dosya Yapisi
+------------
+- Tools/clipboard-keeper/start.command
+- Tools/clipboard-keeper/stop.command
+- Tools/clipboard-keeper/main.py
+- Tools/clipboard-keeper/app/*
+- Tools/clipboard-keeper/README_TR.md
+
+Ilerleme
+--------
+[x] Teknoloji secimi Python + PySide6 olarak guncellendi
+[x] Proje klasoru olusturuldu
+[x] Plan dosyasi olusturuldu ve ilerleme tutuluyor
+[x] Uygulama kodu yazildi
+[x] Bagimliliklar kuruldu
+[x] Ilk acilis / smoke testi yapildi
+
+Devam Ederken Bakilacaklar
+--------------------------
+1. `clipboard-keeper/start.command` ile venv ve bagimlilik kurulumu
+2. Clipboard monitor + JSON store
+3. Sol panel: pinned / recent / show all
+4. Sag panel: sekmeler ve duzenleme
+5. Tray menu + startup manager
+6. Gorsel ince ayar ve kullanim geri bildirimi
+
+Son Not
+-------
+Eger token biterse, once bu dosyayi sonra `clipboard-keeper/README_TR.md`
+ve `clipboard-keeper/main.py` dosyasini acip mevcut durumu takip et.
