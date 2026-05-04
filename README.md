@@ -4,11 +4,20 @@ macOS uzerinde gunluk akisi hizlandiran, lokal calisan kucuk arac kolleksiyonu.
 Hepsi Python ile yazildi, hicbiri internete veri gondermez, veriler tamamen
 lokalde tutulur.
 
+## Neler Var
+
+### Ana Projeler
+
+| Proje | Tip | Ne ise yarar |
+|------|-----|--------------|
+| [clipboard-keeper](#clipboard-keeper) | PySide6 menubar | macOS pano gecmisi: pinleme, sekme, TXT export, bildirim, show-all |
+| [fordeveloper](#fordeveloper) | Flask web | Deployment, task, reminder, daily-note, markdown arama ve workspace paneli |
+
+### Yardimci Arac
+
 | Arac | Tip | Ne ise yarar |
 |------|-----|--------------|
-| [tools-hub](#tools-hub) | PySide6 desktop | Bu repodaki tum araclari tek pencereden baslat / durdur / URL ac / log goster |
-| [clipboard-keeper](#clipboard-keeper-pro) | PySide6 menubar | macOS pano gecmisi: pinleme, sekme, TXT export, "show all" |
-| [fordeveloper](#fordeveloper) | Flask web | Deployment / task / daily-note / md-arama / git-pulse panel |
+| [tools-hub](#tools-hub) | PySide6 desktop | Bu repodaki araclari tek pencereden baslat, durdur, URL ac, log incele, PID/port kill yap |
 
 ```
 Tools/
@@ -46,7 +55,7 @@ Tools klasorunu tarayan, alt klasorlerdeki `start.command` / `app.py` /
 **Yapabildikleri:**
 
 - Alt klasorleri otomatik kesfeder
-- Start / Stop / Restart
+- Start / Stop
 - URL'i tarayicida ac (Flask gibi web uygulamalar icin)
 - Klasoru / log dosyasini Finder'da ac
 - PID kill ve port kill araclari
@@ -56,9 +65,7 @@ Tools klasorunu tarayan, alt klasorlerdeki `start.command` / `app.py` /
 **Calistirma:**
 
 ```bash
-./start.command          # root'tan
-# veya
-./tools-hub/start.command tarzi yapilarda otomatik
+./start.command
 ```
 
 Durum dosyasi: `~/Library/Application Support/ToolsHub/state.json`
