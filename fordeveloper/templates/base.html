@@ -7,7 +7,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}DevPanel{% endblock %} - YS Dev Notes</title>
+    <title>{% block title %}Dashboard{% endblock %} - Deployment Tracking</title>
+    <link rel="stylesheet" href="{{ url_for('ui_effects.static', filename='css/animations.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script>
     window.YS_ANIM = {{ anim_config | tojson }};
@@ -25,7 +26,7 @@
         <div class="splash-inner">
             <div class="splash-phase splash-phase-1" id="splashPhase1">
                 <div class="splash-hex-ring" id="hexRing">
-                    <div class="splash-logo-big">YS</div>
+                    <div class="splash-logo-big">DT</div>
                 </div>
                 <div class="splash-typing" id="splashTyping"></div>
             </div>
@@ -68,8 +69,8 @@
 
     <nav class="sidebar">
         <div class="sidebar-header">
-            <div class="logo">YS</div>
-            <div class="logo-text">Dev Notes</div>
+            <div class="logo">DT</div>
+            <div class="logo-text">Deployment Tracking</div>
         </div>
         <ul class="nav-links">
             <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">
@@ -232,7 +233,7 @@
 
         // ─── Phase 1: Logo + typing text (0-2s)
         const typingEl = document.getElementById('splashTyping');
-        const typeTexts = ['INITIALIZING SYSTEM ...', 'DECRYPTING KERNEL ...', 'LOADING FORDEVELOPER ...'];
+        const typeTexts = ['INITIALIZING SYSTEM ...', 'DECRYPTING KERNEL ...', 'LOADING DEPLOYMENT TRACKING ...'];
         const typeText = typeTexts[Math.floor(Math.random() * typeTexts.length)];
         let ti = 0;
         const typeTimer = setInterval(() => {

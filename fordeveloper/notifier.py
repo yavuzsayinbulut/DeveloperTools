@@ -29,7 +29,7 @@ def _send_terminal_notifier(title, message, url):
             "-message", message,
             "-open", url,
             "-sound", "default",
-            "-group", "fordeveloper",
+            "-group", "deployment-tracking",
             "-appIcon", "",
         ], capture_output=True, timeout=5)
     except Exception as e:

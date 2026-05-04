@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QDesktopServices, QPainter, QPen, QPixmap
+from PySide6.QtGui import QAction, QColor, QCursor, QDesktopServices, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -13,12 +13,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QPlainTextEdit,
     QScrollArea,
     QSplitter,
     QStatusBar,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -30,6 +32,9 @@ from .models import DiscoveredApp
 from .state import HubState
 from .utils import (
     activate_pid,
+    describe_pid,
+    find_pids_by_port,
+    find_ports_by_pid,
     format_dt,
     is_pid_running,
     is_url_reachable,
@@ -101,24 +106,68 @@ QLineEdit:focus, QPlainTextEdit:focus {
     border-color: #2b6cf6;
 }
 QPushButton {
-    background: #edf2ff;
-    border: 1px solid #d8e4ff;
-    border-radius: 12px;
-    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #c7d2e8;
+    border-radius: 10px;
+    padding: 7px 14px;
     color: #16336b;
+    font-weight: 600;
 }
 QPushButton:hover {
-    background: #e2ebff;
+    background: #eef3ff;
+    border-color: #2b6cf6;
+    color: #1845c2;
+}
+QPushButton:pressed {
+    background: #d6e2ff;
+    border-color: #1845c2;
+}
+QPushButton:focus {
+    outline: none;
+    border-color: #2b6cf6;
+}
+QPushButton:disabled {
+    background: #f1f3f8;
+    border-color: #e2e6ef;
+    color: #9aa3b8;
 }
 QPushButton#PrimaryButton {
     background: #2b6cf6;
     color: white;
     border: 1px solid #2b6cf6;
 }
+QPushButton#PrimaryButton:hover {
+    background: #1d57d8;
+    border-color: #1d57d8;
+    color: white;
+}
+QPushButton#PrimaryButton:pressed {
+    background: #1845c2;
+    border-color: #1845c2;
+}
+QPushButton#PrimaryButton:disabled {
+    background: #c4d3f5;
+    border-color: #c4d3f5;
+    color: #ffffff;
+}
 QPushButton#DangerButton {
     background: #fff1f2;
     color: #9f1239;
     border: 1px solid #ffd2da;
+}
+QPushButton#DangerButton:hover {
+    background: #ffe4e6;
+    border-color: #be123c;
+    color: #831134;
+}
+QPushButton#DangerButton:pressed {
+    background: #ffccd1;
+    border-color: #831134;
+}
+QPushButton#DangerButton:disabled {
+    background: #fdf2f3;
+    border-color: #fde0e3;
+    color: #d4a4ad;
 }
 QScrollArea {
     border: none;
@@ -151,6 +200,32 @@ def build_dot(color: str, size: int = 10) -> QPixmap:
     return pixmap
 
 
+def generate_tray_icon(size: int = 22) -> QIcon:
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+
+    color = QColor("#0d9488")
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(color)
+
+    cell = (size - 8) / 2.0
+    gap = 2.0
+    x0 = 3.0
+    y0 = 3.0
+    radius = 1.8
+    for row in range(2):
+        for col in range(2):
+            x = x0 + col * (cell + gap)
+            y = y0 + row * (cell + gap)
+            painter.drawRoundedRect(x, y, cell, cell, radius, radius)
+
+    painter.end()
+    return QIcon(pixmap)
+
+
 class AppCard(QFrame):
     def __init__(
         self,
@@ -176,17 +251,25 @@ class AppCard(QFrame):
         top = QHBoxLayout()
         top.setSpacing(8)
 
+        status_color = "#16a34a" if running else "#f59e0b" if reachable else "#94a3b8"
         status_icon = QLabel()
-        status_icon.setPixmap(build_dot("#16a34a" if running else "#94a3b8"))
+        status_icon.setPixmap(build_dot(status_color))
         top.addWidget(status_icon)
 
         name = QLabel(self.app.name)
         name.setStyleSheet("font-size: 14px; font-weight: 700;")
-        top.addWidget(name)
-        top.addStretch()
+        name.setWordWrap(True)
+        name.setMinimumWidth(0)
+        top.addWidget(name, 1)
 
-        status = QLabel("RUNNING" if running else "STOPPED")
-        status.setObjectName("BadgeGreen" if running else "BadgeGray")
+        if running:
+            status_text, badge = "RUNNING", "BadgeGreen"
+        elif reachable:
+            status_text, badge = "REACHABLE", "BadgeOrange"
+        else:
+            status_text, badge = "STOPPED", "BadgeGray"
+        status = QLabel(status_text)
+        status.setObjectName(badge)
         top.addWidget(status)
         layout.addLayout(top)
 
@@ -224,10 +307,13 @@ class MainWindow(QMainWindow):
         self.manager = manager
         self.apps: List[DiscoveredApp] = []
         self.selected_key = self.state.get_window().get("selected_key", "")
+        self.force_quit = False
+        self.launching: dict[str, bool] = {}
         self.refresh_timer = QTimer(self)
         self.refresh_timer.setInterval(2500)
         self.refresh_timer.timeout.connect(self.refresh_runtime_state)
         self._build()
+        self._create_tray_icon()
         self.refresh_apps()
         self.restore_geometry_from_state()
         self.refresh_timer.start()
@@ -236,6 +322,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(1240, 800)
         self.setStyleSheet(APP_STYLE)
+        self.setWindowIcon(generate_tray_icon(64))
 
         root = QWidget()
         root_layout = QVBoxLayout(root)
@@ -271,6 +358,24 @@ class MainWindow(QMainWindow):
         refresh_button.clicked.connect(self.refresh_apps)
         header_layout.addWidget(refresh_button)
 
+        start_all_button = QPushButton("Start All")
+        start_all_button.setObjectName("PrimaryButton")
+        start_all_button.clicked.connect(self.start_all_apps)
+        header_layout.addWidget(start_all_button)
+
+        stop_all_button = QPushButton("Stop All")
+        stop_all_button.setObjectName("DangerButton")
+        stop_all_button.clicked.connect(self.stop_all_apps)
+        header_layout.addWidget(stop_all_button)
+
+        pid_info_button = QPushButton("PID Bilgi")
+        pid_info_button.clicked.connect(self.prompt_pid_info)
+        header_layout.addWidget(pid_info_button)
+
+        port_info_button = QPushButton("Port Bilgi")
+        port_info_button.clicked.connect(self.prompt_port_info)
+        header_layout.addWidget(port_info_button)
+
         kill_pid_button = QPushButton("PID Kill")
         kill_pid_button.clicked.connect(self.prompt_kill_pid)
         header_layout.addWidget(kill_pid_button)
@@ -286,6 +391,7 @@ class MainWindow(QMainWindow):
 
         left = QFrame()
         left.setObjectName("Surface")
+        left.setMinimumWidth(320)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(16, 16, 16, 16)
         left_layout.setSpacing(12)
@@ -296,6 +402,7 @@ class MainWindow(QMainWindow):
 
         self.list_scroll = QScrollArea()
         self.list_scroll.setWidgetResizable(True)
+        self.list_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list_container = QWidget()
         self.list_layout = QVBoxLayout(self.list_container)
         self.list_layout.setContentsMargins(0, 0, 0, 0)
@@ -367,9 +474,21 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self.stop_selected_app)
         action_row.addWidget(self.stop_button)
 
+        self.restart_button = QPushButton("Restart")
+        self.restart_button.clicked.connect(self.restart_selected_app)
+        action_row.addWidget(self.restart_button)
+
         self.open_url_button = QPushButton("URL Ac")
         self.open_url_button.clicked.connect(self.open_selected_url)
         action_row.addWidget(self.open_url_button)
+
+        self.open_terminal_button = QPushButton("Terminal Ac")
+        self.open_terminal_button.clicked.connect(self.open_selected_terminal)
+        action_row.addWidget(self.open_terminal_button)
+
+        self.health_check_button = QPushButton("Health Check")
+        self.health_check_button.clicked.connect(self.show_selected_health_check)
+        action_row.addWidget(self.health_check_button)
 
         self.open_folder_button = QPushButton("Klasor Ac")
         self.open_folder_button.clicked.connect(self.open_selected_folder)
@@ -405,8 +524,11 @@ class MainWindow(QMainWindow):
 
         right_layout.addWidget(self.detail_card, 1)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(0, 2)
         splitter.setStretchFactor(1, 5)
+        splitter.setSizes([380, 860])
+        self.splitter = splitter
+        splitter.splitterMoved.connect(self._on_splitter_moved)
 
         root_layout.addWidget(splitter, 1)
 
@@ -414,16 +536,122 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.setCentralWidget(root)
 
+        for button in self.findChildren(QPushButton):
+            button.setCursor(Qt.PointingHandCursor)
+
+    def _create_tray_icon(self) -> None:
+        self.tray_icon = QSystemTrayIcon(generate_tray_icon())
+        self.tray_icon.setToolTip(APP_NAME)
+
+        self.tray_menu = QMenu()
+        self._rebuild_tray_menu()
+
+        self.tray_icon.activated.connect(self._handle_tray_activation)
+        self.tray_icon.show()
+
+    def _rebuild_tray_menu(self) -> None:
+        self.tray_menu.clear()
+
+        header = QAction("Uygulamalar", self.tray_menu)
+        header.setEnabled(False)
+        self.tray_menu.addAction(header)
+
+        if not self.apps:
+            empty = QAction("(Henuz uygulama bulunamadi)", self.tray_menu)
+            empty.setEnabled(False)
+            self.tray_menu.addAction(empty)
+        else:
+            for app in self.apps:
+                runtime = self.manager.get_runtime(app)
+                running = bool(runtime.pid and is_pid_running(runtime.pid))
+                url = self.manager.get_url(app)
+                reachable = bool(url and is_url_reachable(url))
+
+                if running:
+                    icon = QIcon(build_dot("#16a34a", 14))
+                elif reachable:
+                    icon = QIcon(build_dot("#f59e0b", 14))
+                else:
+                    icon = QIcon(build_dot("#dc2626", 14))
+
+                action = QAction(app.name, self.tray_menu)
+                action.setIcon(icon)
+                action.triggered.connect(lambda _checked=False, key=app.key: self._tray_open_app(key))
+                self.tray_menu.addAction(action)
+
+        self.tray_menu.addSeparator()
+
+        start_all_action = QAction("Start All", self.tray_menu)
+        start_all_action.triggered.connect(self.start_all_apps)
+        self.tray_menu.addAction(start_all_action)
+
+        stop_all_action = QAction("Stop All", self.tray_menu)
+        stop_all_action.triggered.connect(self.stop_all_apps)
+        self.tray_menu.addAction(stop_all_action)
+
+        self.tray_menu.addSeparator()
+
+        show_action = QAction("Pencereyi Goster", self.tray_menu)
+        show_action.triggered.connect(self.show_window)
+        self.tray_menu.addAction(show_action)
+
+        hide_action = QAction("Pencereyi Gizle", self.tray_menu)
+        hide_action.triggered.connect(self.hide)
+        self.tray_menu.addAction(hide_action)
+
+        rescan_action = QAction("Yeniden Tara", self.tray_menu)
+        rescan_action.triggered.connect(self.refresh_apps)
+        self.tray_menu.addAction(rescan_action)
+
+        self.tray_menu.addSeparator()
+
+        quit_action = QAction("Cikis", self.tray_menu)
+        quit_action.triggered.connect(self.quit_application)
+        self.tray_menu.addAction(quit_action)
+
+    def _tray_open_app(self, app_key: str) -> None:
+        previous = self.selected_key
+        self.selected_key = app_key
+        try:
+            self.open_selected_app()
+        finally:
+            self.selected_key = previous if any(a.key == previous for a in self.apps) else app_key
+            self.refresh_app_list()
+            self.refresh_details()
+            self._rebuild_tray_menu()
+
+    def _handle_tray_activation(self, reason) -> None:
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            self.show_window()
+        elif reason == QSystemTrayIcon.Context:
+            self._rebuild_tray_menu()
+            self.tray_menu.popup(QCursor.pos())
+
+    def show_window(self) -> None:
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_application(self) -> None:
+        self.force_quit = True
+        self.save_geometry_to_state()
+        self.tray_icon.hide()
+        QApplication.instance().quit()
+
     def refresh_apps(self) -> None:
         self.apps = discover_apps()
         if self.apps and not any(app.key == self.selected_key for app in self.apps):
             self.selected_key = self.apps[0].key
         self.refresh_app_list()
         self.refresh_details()
+        if hasattr(self, "tray_menu"):
+            self._rebuild_tray_menu()
 
     def refresh_runtime_state(self) -> None:
         self.refresh_app_list()
         self.refresh_details()
+        if hasattr(self, "tray_menu") and not self.tray_menu.isVisible():
+            self._rebuild_tray_menu()
 
     def refresh_app_list(self) -> None:
         clear_layout(self.list_layout)
@@ -531,7 +759,10 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(bool(app.start_command) and not running and not reachable)
         self.open_button.setEnabled(bool(app.start_command) or bool(resolved_url))
         self.stop_button.setEnabled(running or bool(app.stop_script))
+        self.restart_button.setEnabled(bool(app.start_command) or bool(app.stop_script))
         self.open_url_button.setEnabled(bool(resolved_url))
+        self.open_terminal_button.setEnabled(True)
+        self.health_check_button.setEnabled(True)
         self.open_readme_button.setEnabled(bool(app.readme_path))
 
     def build_log_preview(self, app: DiscoveredApp, runtime) -> str:
@@ -565,46 +796,122 @@ class MainWindow(QMainWindow):
         app = self.get_selected_app()
         if not app:
             return
+        if self.launching.get(app.key):
+            self.status_bar.showMessage("Bu uygulama zaten baslatiliyor.", 2500)
+            return
+        if self.manager.is_app_running(app):
+            self.status_bar.showMessage("Uygulama zaten calisiyor.", 2500)
+            self.refresh_runtime_state()
+            return
         ok, message = self.manager.start_app(app)
         self.status_bar.showMessage(message, 3500)
         if not ok:
             QMessageBox.warning(self, "Start Hatasi", message)
         self.refresh_runtime_state()
 
+    def start_all_apps(self) -> None:
+        if not self.apps:
+            self.status_bar.showMessage("Baslatilacak uygulama yok.", 2500)
+            return
+        started = 0
+        already = 0
+        failed: List[str] = []
+        for app in self.apps:
+            if self.manager.is_app_running(app):
+                already += 1
+                continue
+            ok, message = self.manager.start_app(app)
+            if ok:
+                started += 1
+            else:
+                failed.append(f"{app.name}: {message}")
+        self.refresh_runtime_state()
+        self._rebuild_tray_menu()
+        summary = f"Start All: {started} baslatildi, {already} zaten calisiyordu."
+        if failed:
+            summary += f" {len(failed)} hata."
+            QMessageBox.warning(self, "Start All", "\n".join(failed))
+        self.status_bar.showMessage(summary, 5000)
+
+    def stop_all_apps(self) -> None:
+        if not self.apps:
+            self.status_bar.showMessage("Durdurulacak uygulama yok.", 2500)
+            return
+        answer = QMessageBox.question(
+            self,
+            "Stop All",
+            "Tum uygulamalar durdurulsun mu?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        stopped = 0
+        skipped = 0
+        failed: List[str] = []
+        for app in self.apps:
+            if not self.manager.is_app_running(app):
+                skipped += 1
+                continue
+            ok, message = self.manager.stop_app(app)
+            if ok:
+                stopped += 1
+            else:
+                failed.append(f"{app.name}: {message}")
+        self.refresh_runtime_state()
+        self._rebuild_tray_menu()
+        summary = f"Stop All: {stopped} durduruldu, {skipped} zaten kapaliydi."
+        if failed:
+            summary += f" {len(failed)} hata."
+            QMessageBox.warning(self, "Stop All", "\n".join(failed))
+        self.status_bar.showMessage(summary, 5000)
+
     def open_selected_app(self) -> None:
         app = self.get_selected_app()
         if not app:
             return
 
+        if self.launching.get(app.key):
+            self.status_bar.showMessage(
+                f"{app.name} zaten baslatiliyor, URL hazir olunca acilacak.", 2500
+            )
+            return
+
         runtime = self.manager.get_runtime(app)
         running = bool(runtime.pid and is_pid_running(runtime.pid))
         url = self.manager.get_url(app)
+        reachable = bool(url and is_url_reachable(url))
 
         if app.app_type == "web":
             if not url:
                 QMessageBox.information(self, "URL Yok", "Bu web uygulamasi icin URL tanimli degil.")
                 return
 
-            if not running and not is_url_reachable(url):
-                ok, message = self.manager.start_app(app)
-                self.status_bar.showMessage(message, 3500)
-                if not ok:
-                    QMessageBox.warning(self, "Acma Hatasi", message)
-                    self.refresh_runtime_state()
-                    return
-
-                ready = self.manager.wait_until_ready(app, timeout_seconds=12.0)
+            if reachable or running:
+                QDesktopServices.openUrl(QUrl(url))
+                self.status_bar.showMessage(f"{app.name} URL'i acildi.", 2500)
                 self.refresh_runtime_state()
-                if not ready:
-                    QMessageBox.warning(
-                        self,
-                        "Web Uygulamasi Hazir Degil",
-                        "Uygulama baslatildi ama URL henuz erisilebilir olmadi. Log'lari kontrol et.",
-                    )
-                    return
+                return
 
-            QDesktopServices.openUrl(QUrl(url))
-            self.status_bar.showMessage("Web uygulamasi acildi.", 2500)
+            ok, message = self.manager.start_app(app)
+            if not ok:
+                self.status_bar.showMessage(message, 3500)
+                QMessageBox.warning(self, "Acma Hatasi", message)
+                self.refresh_runtime_state()
+                return
+
+            self.status_bar.showMessage(f"{app.name} baslatiliyor, URL bekleniyor...", 0)
+            self._begin_url_poll(app.key, attempts_left=60)
+            self.refresh_runtime_state()
+            return
+
+        # Desktop app
+        if running:
+            activated = activate_pid(runtime.pid)
+            if activated:
+                self.status_bar.showMessage(f"{app.name} one getirildi.", 2500)
+            else:
+                self.status_bar.showMessage(f"{app.name} zaten calisiyor.", 2500)
             self.refresh_runtime_state()
             return
 
@@ -612,18 +919,56 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(message, 3500)
         if not ok:
             QMessageBox.warning(self, "Acma Hatasi", message)
-        else:
-            runtime = self.manager.get_runtime(app)
-            activated = activate_pid(runtime.pid)
-            if activated:
-                self.status_bar.showMessage("Masaustu uygulamasi one getirildi.", 2500)
-            else:
-                QMessageBox.information(
-                    self,
-                    "Uygulama Baslatildi",
-                    "Masaustu uygulamasi baslatildi. Gorunurde degilse menubar veya acik pencereler arasinda kontrol et.",
-                )
+            self.refresh_runtime_state()
+            return
+
+        self.launching[app.key] = True
+        QTimer.singleShot(1500, lambda key=app.key: self._after_desktop_start(key))
+
+    def _begin_url_poll(self, app_key: str, attempts_left: int) -> None:
+        self.launching[app_key] = True
+        QTimer.singleShot(500, lambda: self._poll_url_once(app_key, attempts_left))
+
+    def _poll_url_once(self, app_key: str, attempts_left: int) -> None:
+        app = next((a for a in self.apps if a.key == app_key), None)
+        if not app:
+            self.launching.pop(app_key, None)
+            return
+
+        url = self.manager.get_url(app)
+        if url and is_url_reachable(url):
+            self.launching.pop(app_key, None)
+            QDesktopServices.openUrl(QUrl(url))
+            self.status_bar.showMessage(f"{app.name} hazir, URL acildi.", 3000)
+            self.refresh_runtime_state()
+            self._rebuild_tray_menu()
+            return
+
+        if attempts_left <= 0:
+            self.launching.pop(app_key, None)
+            self.status_bar.showMessage(
+                f"{app.name} 30 saniyede hazir olmadi.", 4500
+            )
+            QMessageBox.warning(
+                self,
+                "Web Uygulamasi Hazir Degil",
+                f"{app.name} baslatildi ama URL erisilebilir olmadi. Log'lari kontrol et.",
+            )
+            self.refresh_runtime_state()
+            return
+
+        QTimer.singleShot(500, lambda: self._poll_url_once(app_key, attempts_left - 1))
+
+    def _after_desktop_start(self, app_key: str) -> None:
+        self.launching.pop(app_key, None)
+        app = next((a for a in self.apps if a.key == app_key), None)
+        if not app:
+            return
+        runtime = self.manager.get_runtime(app)
+        if runtime.pid:
+            activate_pid(runtime.pid)
         self.refresh_runtime_state()
+        self._rebuild_tray_menu()
 
     def stop_selected_app(self) -> None:
         app = self.get_selected_app()
@@ -634,6 +979,50 @@ class MainWindow(QMainWindow):
         if not ok:
             QMessageBox.warning(self, "Stop Hatasi", message)
         self.refresh_runtime_state()
+
+    def restart_selected_app(self) -> None:
+        app = self.get_selected_app()
+        if not app:
+            return
+        ok, message = self.manager.restart_app(app)
+        self.status_bar.showMessage(message, 3500)
+        if not ok:
+            QMessageBox.warning(self, "Restart Hatasi", message)
+        self.refresh_runtime_state()
+
+    def open_selected_terminal(self) -> None:
+        app = self.get_selected_app()
+        if not app:
+            return
+        ok, message = self.manager.open_terminal(app)
+        self.status_bar.showMessage(message, 3000)
+        if not ok:
+            QMessageBox.warning(self, "Terminal Hatasi", message)
+
+    def show_selected_health_check(self) -> None:
+        app = self.get_selected_app()
+        if not app:
+            return
+        report = self.manager.health_check(app)
+        lines = [
+            f"Ad: {report['name']}",
+            f"Tip: {report['type']}",
+            f"Klasor: {report['path']}",
+            f"Start yontemi: {report['start_mode']}",
+            f"Calisiyor: {'Evet' if report['running'] else 'Hayir'}",
+            f"PID: {report['pid'] or '-'}",
+            f"Son baslatma: {format_dt(str(report['started_at'] or ''))}",
+            f"URL: {report['url'] or '-'}",
+            f"URL erisimi: {'OK' if report['url_reachable'] else 'Yok'}",
+            f"Stdout log: {report['stdout_log'] or '-'}",
+            f"Stderr log: {report['stderr_log'] or '-'}",
+            f"Stop script: {report['stop_script'] or '-'}",
+            f"README: {report['readme_path'] or '-'}",
+        ]
+        if report["last_error"]:
+            lines.append(f"Son hata: {report['last_error']}")
+
+        QMessageBox.information(self, "Health Check", "\n".join(lines))
 
     def open_selected_url(self) -> None:
         app = self.get_selected_app()
@@ -670,6 +1059,125 @@ class MainWindow(QMainWindow):
         if not app or not app.readme_path:
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(app.readme_path))
+
+    def find_apps_for_pid(self, pid: int) -> List[DiscoveredApp]:
+        matches: List[DiscoveredApp] = []
+        command = describe_pid(pid).lower()
+        for app in self.apps:
+            runtime = self.manager.get_runtime(app)
+            if runtime.pid == pid:
+                matches.append(app)
+                continue
+            if command and app.path.lower() in command:
+                matches.append(app)
+        return matches
+
+    def find_apps_for_port(self, port: int) -> List[DiscoveredApp]:
+        token = f":{port}"
+        matches: List[DiscoveredApp] = []
+        for app in self.apps:
+            url = self.manager.get_url(app)
+            if url and token in url:
+                matches.append(app)
+        return matches
+
+    def prompt_pid_info(self) -> None:
+        pid, accepted = QInputDialog.getInt(
+            self,
+            "PID Bilgi",
+            "Bilgi gosterilecek PID gir:",
+            value=0,
+            minValue=0,
+            maxValue=999999,
+        )
+        if not accepted or pid <= 0:
+            return
+
+        running = is_pid_running(pid)
+        command = describe_pid(pid)
+        ports = find_ports_by_pid(pid) if running else []
+        matched_apps = self.find_apps_for_pid(pid) if running else []
+
+        lines = [
+            f"PID: {pid}",
+            f"Calisiyor: {'Evet' if running else 'Hayir'}",
+            f"Komut: {command or '-'}",
+            f"Dinlenen portlar: {', '.join(str(p) for p in ports) if ports else '-'}",
+        ]
+
+        if matched_apps:
+            lines.append("")
+            lines.append("Eslesen uygulama(lar):")
+            for app in matched_apps:
+                url = self.manager.get_url(app) or "-"
+                lines.append(f"  - {app.name} | {url}")
+                lines.append(f"    {app.path}")
+        elif ports:
+            external_apps: List[DiscoveredApp] = []
+            for port in ports:
+                for app in self.find_apps_for_port(port):
+                    if app not in external_apps:
+                        external_apps.append(app)
+            if external_apps:
+                lines.append("")
+                lines.append("Port eslesen uygulama(lar):")
+                for app in external_apps:
+                    url = self.manager.get_url(app) or "-"
+                    lines.append(f"  - {app.name} | {url}")
+
+        QMessageBox.information(self, "PID Bilgi", "\n".join(lines))
+        self.status_bar.showMessage(
+            f"PID {pid}: {len(ports)} port, {len(matched_apps)} eslesen uygulama.",
+            3500,
+        )
+
+    def prompt_port_info(self) -> None:
+        port, accepted = QInputDialog.getInt(
+            self,
+            "Port Bilgi",
+            "Bilgi gosterilecek port gir:",
+            value=0,
+            minValue=0,
+            maxValue=65535,
+        )
+        if not accepted or port <= 0:
+            return
+
+        pids = find_pids_by_port(port)
+        matched_apps = self.find_apps_for_port(port)
+        url_for_port = ""
+        for app in matched_apps:
+            candidate = self.manager.get_url(app)
+            if candidate:
+                url_for_port = candidate
+                break
+
+        lines = [
+            f"Port: {port}",
+            f"Dinleyen PID(ler): {', '.join(str(p) for p in pids) if pids else '-'}",
+            f"URL tahmini: {url_for_port or f'http://127.0.0.1:{port}/'}",
+        ]
+
+        if pids:
+            lines.append("")
+            lines.append("Surec detaylari:")
+            for pid in pids:
+                command = describe_pid(pid) or "-"
+                lines.append(f"  - PID {pid}: {command}")
+
+        if matched_apps:
+            lines.append("")
+            lines.append("Eslesen uygulama(lar):")
+            for app in matched_apps:
+                url = self.manager.get_url(app) or "-"
+                lines.append(f"  - {app.name} | {url}")
+                lines.append(f"    {app.path}")
+
+        QMessageBox.information(self, "Port Bilgi", "\n".join(lines))
+        self.status_bar.showMessage(
+            f"Port {port}: {len(pids)} surec, {len(matched_apps)} eslesen uygulama.",
+            3500,
+        )
 
     def prompt_kill_pid(self) -> None:
         pid, accepted = QInputDialog.getInt(
@@ -730,16 +1238,29 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Port Kill Hatasi", message)
 
     def restore_geometry_from_state(self) -> None:
-        geometry = self.state.get_window().get("geometry")
+        window_state = self.state.get_window()
+        geometry = window_state.get("geometry")
         if geometry and len(geometry) == 4:
             self.setGeometry(*geometry)
+        sizes = window_state.get("splitter_sizes")
+        if sizes and len(sizes) == 2 and all(isinstance(v, int) and v > 0 for v in sizes):
+            self.splitter.setSizes(sizes)
 
     def save_geometry_to_state(self) -> None:
         self.state.update_window(
             geometry=[self.x(), self.y(), self.width(), self.height()],
             selected_key=self.selected_key,
+            splitter_sizes=list(self.splitter.sizes()),
         )
+
+    def _on_splitter_moved(self, *_args) -> None:
+        self.state.update_window(splitter_sizes=list(self.splitter.sizes()))
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         self.save_geometry_to_state()
-        super().closeEvent(event)
+        if self.force_quit:
+            super().closeEvent(event)
+            return
+        event.ignore()
+        self.hide()
+        self.status_bar.showMessage("Tools Hub menubar'da calismaya devam ediyor.", 3000)

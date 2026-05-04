@@ -1,6 +1,6 @@
-# Yavuz Sayinbulut Development Notes Panel
+# Deployment Tracking
 
-Odeal gelistirme sureci icin kisisel dashboard ve hatirlatma sistemi. Deployment takibi, task yonetimi, dokuman tarama ve gunluk not tutma islerini tek bir yerden yonetir.
+Gelistirme sureci icin merkezi dashboard. Deployment takibi, task yonetimi, dokuman tarama ve gunluk not tutmayi tek panelde toplar.
 
 ## Hizli Baslangic
 

@@ -1,24 +1,21 @@
 #!/bin/zsh
+# Tek tikla SADECE Tools Hub'i acar. Diger uygulamalari Tools Hub icindeki
+# "Start All" butonundan tek seferde baslatabilirsin.
+# Hepsini birden durdurmak icin root stop.command'i kullan veya Tools Hub'in
+# "Stop All" butonuna bas.
+
 set -e
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_DIR="$ROOT_DIR/tools-hub"
-VENV_DIR="$ROOT_DIR/.venv"
-STAMP_FILE="$VENV_DIR/.tools_hub_deps_ready"
 
-cd "$APP_DIR"
-
-if [ ! -d "$VENV_DIR" ]; then
-  python3 -m venv "$VENV_DIR"
+if [ ! -x "$ROOT_DIR/tools-hub/start.command" ]; then
+    echo "Hata: $ROOT_DIR/tools-hub/start.command bulunamadi."
+    exit 1
 fi
 
-source "$VENV_DIR/bin/activate"
+echo "[start] Tools Hub"
+"$ROOT_DIR/tools-hub/start.command"
 
-python -m pip install --upgrade pip >/dev/null
-
-if [ ! -f "$STAMP_FILE" ] || [ "requirements.txt" -nt "$STAMP_FILE" ]; then
-  pip install -r requirements.txt
-  touch "$STAMP_FILE"
-fi
-
-exec python main.py
+echo ""
+echo "Tools Hub baslatildi. Diger uygulamalar icin Tools Hub > Start All."
+echo "Bu pencereyi kapatabilirsin."

@@ -29,11 +29,14 @@ env/
 # ─── fordeveloper runtime data (DB, logs, secrets) ──────
 fordeveloper/data/
 fordeveloper/com.odeal.fordeveloper.plist
+fordeveloper/*.log
 fordeveloper/*.pid
 
 # ─── clipboard-keeper runtime logs ──────────────────────
+clipboard-keeper/clipboard-keeper.log
 clipboard-keeper/launchd.out.log
 clipboard-keeper/launchd.err.log
 
 # ─── tools-hub runtime ──────────────────────────────────
 tools-hub/.state/
+tools-hub/*.log

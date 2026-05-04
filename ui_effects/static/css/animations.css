@@ -1,0 +1,154 @@
+/* ui-effects/animations.css
+ *
+ * Generic @keyframes library for terminal/matrix style web UIs.
+ * Pull this file in once and reference the animation names from your own
+ * component CSS. Prefixed with `uix-` for safe coexistence.
+ *
+ * Group: pulse / glow
+ */
+
+@keyframes uix-notif-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+@keyframes uix-soft-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+@keyframes uix-phase-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes uix-page-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes uix-intel-expand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes uix-terminal-line-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Group: hex/splash */
+
+@keyframes uix-hex-pulse {
+    0%, 100% { box-shadow: 0 0 30px rgba(0,255,65,0.2), inset 0 0 20px rgba(0,255,65,0.1); }
+    50%      { box-shadow: 0 0 50px rgba(0,255,65,0.35), inset 0 0 30px rgba(0,255,65,0.15), 0 0 80px rgba(0,255,65,0.1); }
+}
+
+@keyframes uix-hex-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes uix-splash-glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(0,255,65,0.2); }
+    50% { box-shadow: 0 0 30px rgba(0,255,65,0.5); }
+}
+
+@keyframes uix-splash-glow-text {
+    0%, 100% { text-shadow: 0 0 20px rgba(0,255,65,0.4); }
+    50% { text-shadow: 0 0 40px rgba(0,255,65,0.7), 0 0 80px rgba(0,255,65,0.3); }
+}
+
+@keyframes uix-splash-type {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes uix-splash-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Group: brand/welcome */
+
+@keyframes uix-brand-line-in {
+    from { opacity: 0; letter-spacing: 14px; }
+    to   { opacity: 1; letter-spacing: 4px; }
+}
+
+@keyframes uix-brand-sub-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 0.6; transform: translateY(0); }
+}
+
+@keyframes uix-brand-glitch {
+    0%, 92%, 100% { transform: translate(0); text-shadow: 0 0 40px rgba(0,255,65,0.5), 0 0 80px rgba(0,255,65,0.2); }
+    93% { transform: translate(-3px, 1px); text-shadow: -3px 0 #ff0040, 3px 0 #00d4ff, 0 0 40px rgba(0,255,65,0.5); }
+    94% { transform: translate(3px, -1px); text-shadow: 3px 0 #ff0040, -3px 0 #00d4ff, 0 0 40px rgba(0,255,65,0.5); }
+    95% { transform: translate(-1px, -2px); text-shadow: -1px 0 #ff0040, 1px 0 #00d4ff, 0 0 40px rgba(0,255,65,0.5); }
+    96% { transform: translate(0); text-shadow: 0 0 40px rgba(0,255,65,0.5), 0 0 80px rgba(0,255,65,0.2); }
+}
+
+@keyframes uix-welcome-line-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes uix-welcome-fade {
+    from { opacity: 0; transform: translateY(10px) scale(0.95); letter-spacing: 8px; }
+    to { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0; }
+}
+
+/* Group: page transition / glitch / scanline */
+
+@keyframes uix-trans-text-glitch {
+    0%, 92%, 100% { transform: translate(0); }
+    93% { transform: translate(-2px, 1px); text-shadow: -2px 0 #ff0040, 2px 0 #00d4ff, 0 0 20px rgba(0,255,65,0.6); }
+    94% { transform: translate(2px, -1px); text-shadow: 2px 0 #ff0040, -2px 0 #00d4ff, 0 0 20px rgba(0,255,65,0.6); }
+    95% { transform: translate(0); text-shadow: 0 0 20px rgba(0,255,65,0.6), 0 0 60px rgba(0,255,65,0.2); }
+}
+
+@keyframes uix-trans-flash {
+    0% { opacity: 1; }
+    5% { opacity: 0; }
+    8% { opacity: 0.5; }
+    12% { opacity: 0; }
+    100% { opacity: 0; }
+}
+
+@keyframes uix-scanline-move {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 4px; }
+}
+
+@keyframes uix-scanline-flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+    73% { opacity: 1; }
+    75% { opacity: 0.4; }
+    77% { opacity: 1; }
+}
+
+/* Group: utilities */
+
+@keyframes uix-docs-scan {
+    0% { top: 0; opacity: 0; }
+    15% { opacity: 1; }
+    100% { top: calc(100% - 2px); opacity: 0.3; }
+}
+
+/* ----- Reusable utility classes ---------------------------------------- */
+
+.uix-anim-pulse        { animation: uix-soft-pulse 1.5s ease-in-out infinite; }
+.uix-anim-notif-pulse  { animation: uix-notif-pulse 2s ease-in-out infinite; }
+.uix-anim-phase-in     { animation: uix-phase-in 0.45s ease both; }
+.uix-anim-page-enter   { animation: uix-page-enter 0.45s ease both; }
+.uix-anim-line-in      { animation: uix-terminal-line-in 0.3s ease both; }
+.uix-anim-blink        { animation: uix-splash-blink 0.6s steps(2) infinite; }
+.uix-anim-glow         { animation: uix-splash-glow 2s ease-in-out infinite; }
+.uix-anim-hex-spin     { animation: uix-hex-spin 6s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+    [class*="uix-anim-"] {
+        animation: none !important;
+    }
+}

@@ -6,25 +6,18 @@ import uuid
 import webbrowser
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import List
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
-    QColor,
+    QCursor,
     QDesktopServices,
-    QIcon,
     QImage,
-    QPainter,
-    QPen,
-    QPixmap,
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QCheckBox,
     QDialog,
-    QFileDialog,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -33,423 +26,23 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
-    QPlainTextEdit,
     QScrollArea,
-    QSpinBox,
     QSplitter,
     QStatusBar,
     QSystemTrayIcon,
     QTabWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from .constants import APP_NAME, DEFAULT_EXPORT_DIR
-from .models import AppSettings, ClipEntry, WorkspaceTab
+from .constants import APP_NAME
+from .models import ClipEntry, WorkspaceTab
 from .storage import StateStore
 from .startup import StartupManager
+from .ui_dialogs import SettingsDialog
+from .ui_shared import APP_STYLE, clear_layout, generate_tray_icon
+from .ui_widgets import EditorTab, EntryCard
 from .utils import format_dt, format_time, humanize_entry_type, within_days
-
-
-APP_STYLE = """
-QWidget {
-    background: #f6f7fb;
-    color: #172033;
-    font-family: "Helvetica Neue", Arial;
-    font-size: 13px;
-}
-QMainWindow {
-    background: #f6f7fb;
-}
-QFrame#Surface, QFrame#Card, QFrame#EditorCard {
-    background: #ffffff;
-    border: 1px solid #dde3f0;
-    border-radius: 16px;
-}
-QFrame#Card:hover {
-    border-color: #b7c8f6;
-}
-QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox {
-    background: #ffffff;
-    border: 1px solid #d8dfec;
-    border-radius: 12px;
-    padding: 8px 10px;
-    selection-background-color: #2b6cf6;
-}
-QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus {
-    border-color: #2b6cf6;
-}
-QPushButton, QToolButton {
-    background: #edf2ff;
-    border: 1px solid #d8e4ff;
-    border-radius: 12px;
-    padding: 8px 12px;
-    color: #16336b;
-}
-QPushButton:hover, QToolButton:hover {
-    background: #e1ebff;
-}
-QPushButton#PrimaryButton {
-    background: #2b6cf6;
-    border: 1px solid #2b6cf6;
-    color: white;
-}
-QPushButton#PrimaryButton:hover {
-    background: #1e5de0;
-}
-QPushButton#DangerButton {
-    background: #fff1f2;
-    border: 1px solid #ffd4db;
-    color: #9f1239;
-}
-QLabel#TitleLabel {
-    font-size: 21px;
-    font-weight: 700;
-}
-QLabel#MutedLabel {
-    color: #5d6780;
-}
-QLabel#SectionLabel {
-    font-size: 15px;
-    font-weight: 700;
-    color: #24314d;
-}
-QLabel#BadgeLabel {
-    background: #eef3ff;
-    color: #1f57d1;
-    border: 1px solid #d6e2ff;
-    border-radius: 10px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-}
-QTabWidget::pane {
-    border: none;
-}
-QTabBar::tab {
-    background: #e8edf8;
-    border: none;
-    padding: 10px 14px;
-    margin-right: 6px;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-}
-QTabBar::tab:selected {
-    background: #ffffff;
-}
-QScrollArea {
-    border: none;
-    background: transparent;
-}
-QStatusBar {
-    background: #ffffff;
-    border-top: 1px solid #e1e6f2;
-}
-"""
-
-
-def generate_tray_icon(size: int = 22) -> QIcon:
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.transparent)
-
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.Antialiasing)
-
-    pen = QPen(QColor("#2563eb"))
-    pen.setWidthF(1.7)
-    painter.setPen(pen)
-    painter.setBrush(Qt.NoBrush)
-    painter.drawRoundedRect(4, 3, size - 8, size - 7, 4, 4)
-    painter.drawRoundedRect(size / 2 - 4, 1.5, 8, 5, 3, 3)
-    painter.drawLine(7, 10, size - 7, 10)
-    painter.drawLine(7, 14, size - 7, 14)
-    painter.drawLine(7, 18, size - 11, 18)
-    painter.end()
-    return QIcon(pixmap)
-
-
-def clear_layout(layout: QVBoxLayout) -> None:
-    while layout.count():
-        item = layout.takeAt(0)
-        widget = item.widget()
-        child_layout = item.layout()
-        if widget is not None:
-            widget.deleteLater()
-        elif child_layout is not None:
-            clear_layout(child_layout)  # type: ignore[arg-type]
-
-
-class EntryCard(QFrame):
-    def __init__(
-        self,
-        entry: ClipEntry,
-        on_open: Callable[[str], None],
-        on_copy: Callable[[str], None],
-        on_pin: Callable[[str], None],
-        on_delete: Callable[[str], None],
-        on_quick_open: Callable[[str], None],
-    ) -> None:
-        super().__init__()
-        self.entry = entry
-        self.on_open = on_open
-        self.setObjectName("Card")
-        self.setFrameShape(QFrame.StyledPanel)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(entry.content or entry.preview)
-
-        wrapper = QVBoxLayout(self)
-        wrapper.setContentsMargins(14, 12, 14, 12)
-        wrapper.setSpacing(10)
-
-        top_row = QHBoxLayout()
-        badge = QLabel(humanize_entry_type(entry.entry_type))
-        badge.setObjectName("BadgeLabel")
-        top_row.addWidget(badge)
-
-        time_label = QLabel(format_time(entry.created_at))
-        time_label.setObjectName("MutedLabel")
-        top_row.addWidget(time_label)
-        top_row.addStretch()
-
-        pin_button = QToolButton()
-        pin_button.setText("Unpin" if entry.pinned else "Pin")
-        pin_button.clicked.connect(lambda: on_pin(entry.id))
-        top_row.addWidget(pin_button)
-
-        open_button = QToolButton()
-        open_button.setText("Sekme")
-        open_button.clicked.connect(lambda: on_open(entry.id))
-        top_row.addWidget(open_button)
-
-        copy_button = QToolButton()
-        copy_button.setText("Kopyala")
-        copy_button.clicked.connect(lambda: on_copy(entry.id))
-        top_row.addWidget(copy_button)
-
-        if entry.entry_type in {"url", "url-list", "file-list", "image"}:
-            quick_button = QToolButton()
-            quick_button.setText("Ac")
-            quick_button.clicked.connect(lambda: on_quick_open(entry.id))
-            top_row.addWidget(quick_button)
-
-        delete_button = QToolButton()
-        delete_button.setText("Tek Sil")
-        delete_button.setToolTip("Bu kaydi tek basina sil")
-        delete_button.clicked.connect(lambda: on_delete(entry.id))
-        top_row.addWidget(delete_button)
-
-        wrapper.addLayout(top_row)
-
-        title = QLabel(entry.title)
-        title.setStyleSheet("font-size: 14px; font-weight: 700;")
-        title.setWordWrap(True)
-        wrapper.addWidget(title)
-
-        preview = QLabel(entry.preview or entry.content)
-        preview.setWordWrap(True)
-        preview.setObjectName("MutedLabel")
-        preview.setToolTip(entry.content or entry.preview)
-        wrapper.addWidget(preview)
-
-        note_text = entry.note.strip()
-        if note_text:
-            note_label = QLabel(f"Not: {note_text}")
-            note_label.setWordWrap(True)
-            note_label.setStyleSheet("color: #30538a;")
-            wrapper.addWidget(note_label)
-
-    def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
-        super().mouseDoubleClickEvent(event)
-        self.on_open(self.entry.id)
-
-
-class EditorTab(QWidget):
-    def __init__(
-        self,
-        tab_data: WorkspaceTab,
-        source_entry: Optional[ClipEntry],
-        on_change: Callable[[], None],
-        on_save_source: Callable[[WorkspaceTab], None],
-        on_copy: Callable[[str], None],
-    ) -> None:
-        super().__init__()
-        self.tab_data = tab_data
-        self.source_entry = source_entry
-        self.on_change = on_change
-        self.on_save_source = on_save_source
-        self.on_copy = on_copy
-        self._build()
-
-    def _build(self) -> None:
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(12)
-
-        card = QFrame()
-        card.setObjectName("EditorCard")
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(18, 18, 18, 18)
-        card_layout.setSpacing(12)
-
-        title_row = QHBoxLayout()
-        self.title_edit = QLineEdit(self.tab_data.title)
-        self.title_edit.setPlaceholderText("Sekme basligi")
-        self.title_edit.textChanged.connect(self._mark_changed)
-        title_row.addWidget(self.title_edit)
-
-        self.meta_label = QLabel(self._meta_text())
-        self.meta_label.setObjectName("MutedLabel")
-        title_row.addWidget(self.meta_label)
-        card_layout.addLayout(title_row)
-
-        if self.source_entry and self.source_entry.entry_type == "image" and self.source_entry.image_path:
-            image_label = QLabel()
-            pixmap = QPixmap(self.source_entry.image_path)
-            if not pixmap.isNull():
-                image_label.setPixmap(
-                    pixmap.scaled(360, 220, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                )
-                card_layout.addWidget(image_label)
-
-        self.editor = QPlainTextEdit(self.tab_data.content)
-        self.editor.setPlaceholderText("Burada duzenleyebilir, not alabilir, birlestirebilirsin.")
-        self.editor.textChanged.connect(self._mark_changed)
-        card_layout.addWidget(self.editor, 1)
-
-        button_row = QHBoxLayout()
-        button_row.addStretch()
-
-        copy_button = QPushButton("Metni Kopyala")
-        copy_button.clicked.connect(lambda: self.on_copy(self.editor.toPlainText()))
-        button_row.addWidget(copy_button)
-
-        save_button = QPushButton("Kaydi Guncelle")
-        save_button.setObjectName("PrimaryButton")
-        save_button.clicked.connect(lambda: self.on_save_source(self.to_workspace_tab()))
-        button_row.addWidget(save_button)
-        card_layout.addLayout(button_row)
-
-        root.addWidget(card)
-
-    def _meta_text(self) -> str:
-        if self.source_entry:
-            return f"Kaynak: {humanize_entry_type(self.source_entry.entry_type)}"
-        return "Serbest not sekmesi"
-
-    def _mark_changed(self) -> None:
-        self.on_change()
-
-    def to_workspace_tab(self) -> WorkspaceTab:
-        return WorkspaceTab(
-            id=self.tab_data.id,
-            title=self.title_edit.text().strip() or "Adsiz sekme",
-            content=self.editor.toPlainText(),
-            source_entry_id=self.tab_data.source_entry_id,
-            entry_type=self.tab_data.entry_type,
-            created_at=self.tab_data.created_at,
-            updated_at=datetime.now().astimezone().isoformat(),
-        )
-
-
-class SettingsDialog(QDialog):
-    def __init__(self, settings: AppSettings, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Ayarlar")
-        self.settings = settings
-        self._build()
-
-    def _build(self) -> None:
-        root = QVBoxLayout(self)
-        form = QFormLayout()
-
-        self.recent_limit = QSpinBox()
-        self.recent_limit.setRange(5, 50)
-        self.recent_limit.setValue(self.settings.recent_limit)
-        form.addRow("Son kayit sayisi", self.recent_limit)
-
-        self.show_all_days = QSpinBox()
-        self.show_all_days.setRange(1, 180)
-        self.show_all_days.setValue(self.settings.show_all_days)
-        form.addRow("Show all gun araligi", self.show_all_days)
-
-        self.retention_days = QSpinBox()
-        self.retention_days.setRange(10, 365)
-        self.retention_days.setValue(self.settings.retention_days)
-        form.addRow("Veri saklama gunu", self.retention_days)
-
-        self.poll_interval = QSpinBox()
-        self.poll_interval.setRange(350, 5000)
-        self.poll_interval.setValue(self.settings.poll_interval_ms)
-        self.poll_interval.setSuffix(" ms")
-        form.addRow("Pano kontrol araligi", self.poll_interval)
-
-        self.ignore_duplicates = QCheckBox("Ardisik ayni kopyalari atla")
-        self.ignore_duplicates.setChecked(self.settings.ignore_consecutive_duplicates)
-        form.addRow("", self.ignore_duplicates)
-
-        self.show_notifications = QCheckBox("Yeni kopyalarda bildirim goster")
-        self.show_notifications.setChecked(self.settings.show_notifications)
-        form.addRow("", self.show_notifications)
-
-        self.start_at_login = QCheckBox("Acilista baslat")
-        self.start_at_login.setChecked(self.settings.start_at_login)
-        form.addRow("", self.start_at_login)
-
-        self.always_on_top = QCheckBox("Pencereyi her zaman ustte tut")
-        self.always_on_top.setChecked(self.settings.always_on_top)
-        form.addRow("", self.always_on_top)
-
-        self.hide_dock_icon = QCheckBox("Dock ikonunu gizlemeyi dene")
-        self.hide_dock_icon.setChecked(self.settings.hide_dock_icon)
-        form.addRow("", self.hide_dock_icon)
-
-        export_row = QHBoxLayout()
-        self.export_dir = QLineEdit(self.settings.export_dir)
-        export_row.addWidget(self.export_dir)
-        choose_button = QPushButton("Sec")
-        choose_button.clicked.connect(self._choose_export_dir)
-        export_row.addWidget(choose_button)
-        export_wrapper = QWidget()
-        export_wrapper.setLayout(export_row)
-        form.addRow("Export klasoru", export_wrapper)
-
-        root.addLayout(form)
-
-        buttons = QHBoxLayout()
-        buttons.addStretch()
-        cancel_button = QPushButton("Vazgec")
-        cancel_button.clicked.connect(self.reject)
-        buttons.addWidget(cancel_button)
-        save_button = QPushButton("Kaydet")
-        save_button.setObjectName("PrimaryButton")
-        save_button.clicked.connect(self.accept)
-        buttons.addWidget(save_button)
-        root.addLayout(buttons)
-
-    def _choose_export_dir(self) -> None:
-        selected = QFileDialog.getExistingDirectory(
-            self,
-            "Export klasoru sec",
-            self.export_dir.text() or str(DEFAULT_EXPORT_DIR),
-        )
-        if selected:
-            self.export_dir.setText(selected)
-
-    def build_settings(self) -> AppSettings:
-        return AppSettings(
-            recent_limit=self.recent_limit.value(),
-            show_all_days=self.show_all_days.value(),
-            retention_days=self.retention_days.value(),
-            always_on_top=self.always_on_top.isChecked(),
-            start_at_login=self.start_at_login.isChecked(),
-            show_notifications=self.show_notifications.isChecked(),
-            ignore_consecutive_duplicates=self.ignore_duplicates.isChecked(),
-            poll_interval_ms=self.poll_interval.value(),
-            restore_tabs=True,
-            hide_dock_icon=self.hide_dock_icon.isChecked(),
-            export_dir=self.export_dir.text().strip() or str(DEFAULT_EXPORT_DIR),
-        )
 
 
 class MainWindow(QMainWindow):
@@ -597,28 +190,28 @@ class MainWindow(QMainWindow):
         self.tray_icon = QSystemTrayIcon(generate_tray_icon())
         self.tray_icon.setToolTip(APP_NAME)
 
-        menu = QMenu()
+        self.tray_menu = QMenu()
         show_action = QAction("Pencereyi Goster", self)
         show_action.triggered.connect(self.show_window)
-        menu.addAction(show_action)
+        self.tray_menu.addAction(show_action)
 
         hide_action = QAction("Pencereyi Gizle", self)
         hide_action.triggered.connect(self.hide)
-        menu.addAction(hide_action)
+        self.tray_menu.addAction(hide_action)
 
         new_tab_action = QAction("Yeni Not Sekmesi", self)
         new_tab_action.triggered.connect(self.create_blank_tab)
-        menu.addAction(new_tab_action)
+        self.tray_menu.addAction(new_tab_action)
 
-        menu.addSeparator()
+        self.tray_menu.addSeparator()
 
         copy_latest_action = QAction("Son Kaydi Kopyala", self)
         copy_latest_action.triggered.connect(self.copy_latest_entry)
-        menu.addAction(copy_latest_action)
+        self.tray_menu.addAction(copy_latest_action)
 
         clear_recent_action = QAction("Pinli Disindakileri Temizle", self)
         clear_recent_action.triggered.connect(self.clear_recent_entries)
-        menu.addAction(clear_recent_action)
+        self.tray_menu.addAction(clear_recent_action)
 
         open_export_action = QAction("Export Klasorunu Ac", self)
         open_export_action.triggered.connect(
@@ -626,24 +219,22 @@ class MainWindow(QMainWindow):
                 QUrl.fromLocalFile(str(Path(self.settings.export_dir).expanduser()))
             )
         )
-        menu.addAction(open_export_action)
+        self.tray_menu.addAction(open_export_action)
 
-        menu.addSeparator()
+        self.tray_menu.addSeparator()
 
         quit_action = QAction("Cikis", self)
         quit_action.triggered.connect(self.quit_application)
-        menu.addAction(quit_action)
+        self.tray_menu.addAction(quit_action)
 
-        self.tray_icon.setContextMenu(menu)
         self.tray_icon.activated.connect(self._handle_tray_activation)
         self.tray_icon.show()
 
     def _handle_tray_activation(self, reason) -> None:
-        if reason == QSystemTrayIcon.Trigger:
-            if self.isVisible():
-                self.hide()
-            else:
-                self.show_window()
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            self.show_window()
+        elif reason == QSystemTrayIcon.Context:
+            self.tray_menu.popup(QCursor.pos())
 
     def show_window(self) -> None:
         self.show()

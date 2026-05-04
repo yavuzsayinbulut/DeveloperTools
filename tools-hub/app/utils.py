@@ -161,6 +161,119 @@ def find_pids_by_port(port: int) -> list[int]:
     return sorted(seen)
 
 
+def _pid_cwd(pid: int) -> str:
+    if not pid or pid <= 0:
+        return ""
+    try:
+        result = subprocess.run(
+            ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return ""
+    for line in result.stdout.splitlines():
+        if line.startswith("n"):
+            return line[1:]
+    return ""
+
+
+def find_pids_by_path(app_path: str, entrypoints: tuple[str, ...] = ("main.py", "app.py")) -> list[int]:
+    if not app_path:
+        return []
+    pids: set[int] = set()
+    own_pid = os.getpid()
+    abs_app_path = os.path.abspath(app_path)
+
+    for entrypoint in entrypoints:
+        target = os.path.join(abs_app_path, entrypoint)
+        if not os.path.exists(target):
+            continue
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", target],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except Exception:
+            continue
+        for line in result.stdout.split():
+            value = line.strip()
+            if not value.isdigit():
+                continue
+            value_int = int(value)
+            if value_int == own_pid:
+                continue
+            pids.add(value_int)
+
+    if pids:
+        return sorted(pids)
+
+    # Fallback: a process may have argv like "Python main.py" with the app
+    # directory as cwd (typical for shell scripts that `cd` before exec).
+    # We scan any python invoking main.py / app.py and match via lsof cwd.
+    candidates: set[int] = set()
+    for entrypoint in entrypoints:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", entrypoint],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except Exception:
+            continue
+        for line in result.stdout.split():
+            value = line.strip()
+            if value.isdigit():
+                candidates.add(int(value))
+
+    candidates.discard(own_pid)
+    for pid in candidates:
+        if _pid_cwd(pid) == abs_app_path:
+            pids.add(pid)
+    return sorted(pids)
+
+
+def find_ports_by_pid(pid: int) -> list[int]:
+    if not pid or pid <= 0:
+        return []
+    try:
+        result = subprocess.run(
+            ["lsof", "-a", "-nP", "-p", str(pid), "-iTCP", "-sTCP:LISTEN"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return []
+    ports: set[int] = set()
+    for line in result.stdout.splitlines():
+        match = re.search(r":(\d{1,5})\s+\(LISTEN\)", line)
+        if match:
+            value = int(match.group(1))
+            if 0 < value <= 65535:
+                ports.add(value)
+    return sorted(ports)
+
+
+def describe_pid(pid: int) -> str:
+    if not pid or pid <= 0:
+        return ""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return ""
+
+
 def kill_port(port: int) -> tuple[bool, str]:
     pids = find_pids_by_port(port)
     if not pids:

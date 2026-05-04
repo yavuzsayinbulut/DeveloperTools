@@ -5,8 +5,8 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$APP_DIR/.." && pwd)"
 VENV_DIR="$ROOT_DIR/.venv"
 PYTHON_BIN="$VENV_DIR/bin/python3"
-STAMP_FILE="$VENV_DIR/.clipboard_keeper_deps_ready"
-LOG_FILE="$APP_DIR/clipboard-keeper.log"
+STAMP_FILE="$VENV_DIR/.tools_hub_deps_ready"
+LOG_FILE="$APP_DIR/tools-hub.log"
 
 ensure_venv() {
     local venv="$1"
@@ -31,6 +31,6 @@ nohup "$PYTHON_BIN" "$APP_DIR/main.py" >> "$LOG_FILE" 2>&1 &
 APP_PID=$!
 disown
 
-echo "Clipboard Keeper baslatildi (PID: $APP_PID)."
+echo "Tools Hub baslatildi (PID: $APP_PID)."
 echo "Bu pencereyi kapatabilirsiniz; uygulama menubar'da calismaya devam edecek."
 echo "Loglar: $LOG_FILE"

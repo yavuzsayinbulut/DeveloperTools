@@ -1,4 +1,24 @@
 #!/bin/zsh
-set -e
+# Tek tikla butun Tools uygulamalarini durdurur.
 
-pkill -f "tools-hub/main.py" || true
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+run() {
+    local label="$1"
+    local script="$2"
+    if [ ! -x "$script" ]; then
+        echo "[skip] $label - script bulunamadi"
+        return 0
+    fi
+    echo "[stop] $label"
+    "$script" || true
+}
+
+run "Deployment Tracking"  "$ROOT_DIR/fordeveloper/stop.command"
+run "Clipboard Keeper"     "$ROOT_DIR/clipboard-keeper/stop.command"
+
+echo "[stop] Tools Hub"
+pkill -f "$ROOT_DIR/tools-hub/main.py" || true
+
+echo ""
+echo "Hepsi durduruldu."
