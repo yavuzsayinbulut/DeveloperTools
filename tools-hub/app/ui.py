@@ -18,9 +18,12 @@ from PySide6.QtWidgets import (
     QPushButton,
     QPlainTextEdit,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QSystemTrayIcon,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -29,6 +32,7 @@ from .constants import APP_NAME
 from .discovery import discover_apps
 from .manager import AppManager
 from .models import DiscoveredApp
+from .projects_view import ProjectsView
 from .state import HubState
 from .utils import (
     activate_pid,
@@ -45,137 +49,442 @@ from .utils import (
 
 
 APP_STYLE = """
+* {
+    font-family: "SF Pro Text", "Helvetica Neue", "Inter", Arial, sans-serif;
+}
+QMainWindow, QWidget#RootSurface {
+    background: #F5F6F9;
+}
 QWidget {
-    background: #f4f6fb;
-    color: #172033;
-    font-family: "Helvetica Neue", Arial;
+    color: #0F172A;
     font-size: 13px;
 }
-QFrame#Surface, QFrame#Card, QFrame#DetailCard {
-    background: #ffffff;
-    border: 1px solid #dde4f0;
-    border-radius: 18px;
+
+/* ---------- Sidebar ---------- */
+QFrame#Sidebar {
+    background: #0E1117;
+    border: none;
 }
-QFrame#Card[selected="true"] {
-    border: 2px solid #2b6cf6;
-    background: #f8fbff;
-}
-QFrame#Card:hover {
-    border-color: #b8c8f2;
-}
-QLabel#TitleLabel {
-    font-size: 24px;
+QLabel#SidebarBrand {
+    color: #FFFFFF;
+    font-size: 16px;
     font-weight: 700;
+    letter-spacing: -0.2px;
 }
-QLabel#SectionLabel {
-    font-size: 15px;
-    font-weight: 700;
-}
-QLabel#MutedLabel {
-    color: #5f6a82;
-}
-QLabel#BadgeBlue, QLabel#BadgeGreen, QLabel#BadgeGray, QLabel#BadgeOrange {
-    border-radius: 10px;
-    padding: 3px 8px;
+QLabel#SidebarTagline {
+    color: #6B7280;
     font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+QLabel#SidebarSection {
+    color: #6B7280;
+    font-size: 10px;
     font-weight: 700;
+    letter-spacing: 1.2px;
+    padding: 4px 4px 2px 4px;
 }
-QLabel#BadgeBlue {
-    background: #ebf3ff;
-    color: #1c56cc;
-}
-QLabel#BadgeGreen {
-    background: #e9f9ef;
-    color: #137b3f;
-}
-QLabel#BadgeGray {
-    background: #eef1f6;
-    color: #5f6a82;
-}
-QLabel#BadgeOrange {
-    background: #fff4e8;
-    color: #a85712;
-}
-QLineEdit, QPlainTextEdit {
-    background: #ffffff;
-    border: 1px solid #d7deeb;
-    border-radius: 12px;
-    padding: 8px 10px;
-}
-QLineEdit:focus, QPlainTextEdit:focus {
-    border-color: #2b6cf6;
-}
-QPushButton {
-    background: #ffffff;
-    border: 1px solid #c7d2e8;
+QPushButton#NavButton {
+    background: transparent;
+    border: none;
     border-radius: 10px;
-    padding: 7px 14px;
-    color: #16336b;
+    padding: 10px 14px;
+    color: #C7CDD6;
+    font-size: 13.5px;
+    font-weight: 500;
+    text-align: left;
+}
+QPushButton#NavButton:hover {
+    background: #1A1F29;
+    color: #FFFFFF;
+}
+QPushButton#NavButton[active="true"] {
+    background: #1F2530;
+    color: #FFFFFF;
     font-weight: 600;
 }
+QPushButton#SidebarAction {
+    background: transparent;
+    border: 1px solid #20242E;
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #C7CDD6;
+    font-weight: 500;
+    text-align: left;
+}
+QPushButton#SidebarAction:hover {
+    background: #1A1F29;
+    border-color: #2A3140;
+    color: #FFFFFF;
+}
+QToolButton#SidebarToolMenu {
+    background: transparent;
+    border: 1px solid #20242E;
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #C7CDD6;
+    font-weight: 500;
+    text-align: left;
+}
+QToolButton#SidebarToolMenu:hover {
+    background: #1A1F29;
+    border-color: #2A3140;
+    color: #FFFFFF;
+}
+QToolButton#SidebarToolMenu::menu-indicator {
+    image: none;
+    width: 0;
+}
+QFrame#SidebarDivider {
+    background: #1B1F27;
+    max-height: 1px;
+    min-height: 1px;
+    margin: 8px 4px;
+    border: none;
+}
+QFrame#SidebarFooter {
+    background: transparent;
+    border-top: 1px solid #1B1F27;
+}
+
+/* ---------- Surfaces ---------- */
+QFrame#Surface {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EE;
+    border-radius: 14px;
+}
+QFrame#Card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EE;
+    border-radius: 12px;
+}
+QFrame#Card:hover {
+    border-color: #C8CFDC;
+}
+QFrame#Card[selected="true"] {
+    border: 1px solid #4F46E5;
+    background: #F7F7FE;
+}
+QFrame#DetailCard {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EE;
+    border-radius: 14px;
+}
+QFrame#InsetPanel {
+    background: #F8F9FC;
+    border: 1px solid #ECEEF3;
+    border-radius: 12px;
+}
+QFrame#SectionDivider {
+    background: #ECEEF3;
+    max-height: 1px;
+    min-height: 1px;
+    border: none;
+}
+
+/* ---------- Header ---------- */
+QFrame#HeaderBar {
+    background: #FFFFFF;
+    border: none;
+    border-bottom: 1px solid #ECEEF3;
+}
+QLabel#HeaderTitle {
+    color: #0F172A;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+}
+QLabel#HeaderSubtitle {
+    color: #64748B;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* ---------- Typography ---------- */
+QLabel#TitleLabel {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.3px;
+}
+QLabel#SectionLabel {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.1px;
+}
+QLabel#GroupLabel {
+    color: #64748B;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 1.0px;
+}
+QLabel#MutedLabel {
+    color: #64748B;
+}
+QLabel#FaintLabel {
+    color: #94A3B8;
+    font-size: 11.5px;
+}
+QLabel#StatNumber {
+    color: #0F172A;
+    font-size: 18px;
+    font-weight: 700;
+}
+QLabel#StatLabel {
+    color: #64748B;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* ---------- Badges ---------- */
+QLabel#BadgeBlue, QLabel#BadgeGreen, QLabel#BadgeGray,
+QLabel#BadgeOrange, QLabel#BadgeRed, QLabel#BadgeIndigo {
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}
+QLabel#BadgeBlue {
+    background: #EEF2FF;
+    color: #4338CA;
+}
+QLabel#BadgeIndigo {
+    background: #F3F2FE;
+    color: #4F46E5;
+}
+QLabel#BadgeGreen {
+    background: #ECFDF5;
+    color: #047857;
+}
+QLabel#BadgeGray {
+    background: #F1F3F8;
+    color: #64748B;
+}
+QLabel#BadgeOrange {
+    background: #FFF7ED;
+    color: #C2410C;
+}
+QLabel#BadgeRed {
+    background: #FEF2F2;
+    color: #B91C1C;
+}
+
+/* ---------- Inputs ---------- */
+QLineEdit, QPlainTextEdit {
+    background: #FFFFFF;
+    border: 1px solid #DDE1EA;
+    border-radius: 10px;
+    padding: 8px 12px;
+    selection-background-color: #C7D2FE;
+    selection-color: #1E1B4B;
+}
+QLineEdit:focus, QPlainTextEdit:focus {
+    border-color: #4F46E5;
+}
+QLineEdit#SearchInput {
+    padding-left: 14px;
+    font-size: 13px;
+}
+QPlainTextEdit {
+    font-family: "JetBrains Mono", "SF Mono", "Menlo", monospace;
+    font-size: 12px;
+    color: #1F2937;
+}
+
+/* ---------- Buttons ---------- */
+QPushButton {
+    background: #FFFFFF;
+    border: 1px solid #DDE1EA;
+    border-radius: 9px;
+    padding: 7px 14px;
+    color: #1F2937;
+    font-weight: 600;
+    font-size: 12.5px;
+}
 QPushButton:hover {
-    background: #eef3ff;
-    border-color: #2b6cf6;
-    color: #1845c2;
+    background: #F8F9FC;
+    border-color: #BFC6D4;
+    color: #0F172A;
 }
 QPushButton:pressed {
-    background: #d6e2ff;
-    border-color: #1845c2;
+    background: #EEF0F4;
+    border-color: #9AA3B8;
 }
 QPushButton:focus {
     outline: none;
-    border-color: #2b6cf6;
+    border-color: #4F46E5;
 }
 QPushButton:disabled {
-    background: #f1f3f8;
-    border-color: #e2e6ef;
-    color: #9aa3b8;
+    background: #F4F5F8;
+    border-color: #E5E7EE;
+    color: #B0B7C5;
 }
 QPushButton#PrimaryButton {
-    background: #2b6cf6;
-    color: white;
-    border: 1px solid #2b6cf6;
+    background: #4F46E5;
+    color: #FFFFFF;
+    border: 1px solid #4F46E5;
 }
 QPushButton#PrimaryButton:hover {
-    background: #1d57d8;
-    border-color: #1d57d8;
-    color: white;
+    background: #4338CA;
+    border-color: #4338CA;
 }
 QPushButton#PrimaryButton:pressed {
-    background: #1845c2;
-    border-color: #1845c2;
+    background: #3730A3;
+    border-color: #3730A3;
 }
 QPushButton#PrimaryButton:disabled {
-    background: #c4d3f5;
-    border-color: #c4d3f5;
-    color: #ffffff;
+    background: #C7C5F4;
+    border-color: #C7C5F4;
+    color: #FFFFFF;
 }
 QPushButton#DangerButton {
-    background: #fff1f2;
-    color: #9f1239;
-    border: 1px solid #ffd2da;
+    background: #FFFFFF;
+    color: #B91C1C;
+    border: 1px solid #FECACA;
 }
 QPushButton#DangerButton:hover {
-    background: #ffe4e6;
-    border-color: #be123c;
-    color: #831134;
+    background: #FEF2F2;
+    border-color: #F87171;
+    color: #991B1B;
 }
 QPushButton#DangerButton:pressed {
-    background: #ffccd1;
-    border-color: #831134;
+    background: #FEE2E2;
+    border-color: #DC2626;
 }
 QPushButton#DangerButton:disabled {
-    background: #fdf2f3;
-    border-color: #fde0e3;
-    color: #d4a4ad;
+    background: #FCFCFD;
+    border-color: #F1F3F8;
+    color: #C9CFDB;
 }
+QPushButton#GhostButton {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #4F46E5;
+    font-weight: 600;
+}
+QPushButton#GhostButton:hover {
+    background: #F3F2FE;
+    border-color: #E0DEFB;
+}
+QToolButton#ToolsMenuButton {
+    background: #FFFFFF;
+    border: 1px solid #DDE1EA;
+    border-radius: 9px;
+    padding: 7px 14px;
+    color: #1F2937;
+    font-weight: 600;
+    font-size: 12.5px;
+}
+QToolButton#ToolsMenuButton:hover {
+    background: #F8F9FC;
+    border-color: #BFC6D4;
+}
+QToolButton#ToolsMenuButton::menu-indicator {
+    image: none;
+    width: 0;
+}
+
+/* ---------- Scrollbars ---------- */
 QScrollArea {
     border: none;
     background: transparent;
 }
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 4px 2px;
+}
+QScrollBar::handle:vertical {
+    background: #D7DCE5;
+    border-radius: 4px;
+    min-height: 30px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #B8C0CD;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 2px 4px;
+}
+QScrollBar::handle:horizontal {
+    background: #D7DCE5;
+    border-radius: 4px;
+    min-width: 30px;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0;
+}
+
+/* ---------- Status / Splitter / Tabs (legacy) ---------- */
 QStatusBar {
-    background: #ffffff;
-    border-top: 1px solid #e1e6f2;
+    background: #FFFFFF;
+    border-top: 1px solid #ECEEF3;
+    color: #475569;
+    font-size: 12px;
+}
+QStatusBar::item {
+    border: none;
+}
+QSplitter::handle {
+    background: transparent;
+}
+QSplitter::handle:horizontal {
+    width: 8px;
+}
+QTabWidget::pane {
+    border: none;
+    background: transparent;
+}
+QTabBar::tab {
+    background: transparent;
+    color: #64748B;
+    padding: 8px 14px;
+    font-weight: 600;
+}
+QTabBar::tab:selected {
+    color: #4F46E5;
+}
+
+/* ---------- Menu ---------- */
+QMenu {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EE;
+    border-radius: 10px;
+    padding: 6px;
+}
+QMenu::item {
+    padding: 7px 14px;
+    border-radius: 6px;
+    color: #1F2937;
+}
+QMenu::item:selected {
+    background: #F3F2FE;
+    color: #4338CA;
+}
+QMenu::item:disabled {
+    color: #94A3B8;
+}
+QMenu::separator {
+    height: 1px;
+    background: #ECEEF3;
+    margin: 6px 4px;
+}
+
+/* ---------- Tooltip ---------- */
+QToolTip {
+    background: #0F172A;
+    color: #F8FAFC;
+    border: 1px solid #1F2937;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 12px;
 }
 """
 
@@ -207,7 +516,7 @@ def generate_tray_icon(size: int = 22) -> QIcon:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
 
-    color = QColor("#0d9488")
+    color = QColor("#4F46E5")
     painter.setPen(Qt.NoPen)
     painter.setBrush(color)
 
@@ -215,7 +524,7 @@ def generate_tray_icon(size: int = 22) -> QIcon:
     gap = 2.0
     x0 = 3.0
     y0 = 3.0
-    radius = 1.8
+    radius = 2.4
     for row in range(2):
         for col in range(2):
             x = x0 + col * (cell + gap)
@@ -224,6 +533,29 @@ def generate_tray_icon(size: int = 22) -> QIcon:
 
     painter.end()
     return QIcon(pixmap)
+
+
+def generate_brand_mark(size: int = 28) -> QPixmap:
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(QColor("#4F46E5"))
+    painter.drawRoundedRect(0, 0, size, size, size * 0.28, size * 0.28)
+    painter.setBrush(QColor("#FFFFFF"))
+    cell = size * 0.20
+    gap = size * 0.08
+    base_x = (size - (cell * 2 + gap)) / 2
+    base_y = (size - (cell * 2 + gap)) / 2
+    radius = cell * 0.22
+    for r in range(2):
+        for c in range(2):
+            x = base_x + c * (cell + gap)
+            y = base_y + r * (cell + gap)
+            painter.drawRoundedRect(x, y, cell, cell, radius, radius)
+    painter.end()
+    return pixmap
 
 
 class AppCard(QFrame):
@@ -246,51 +578,53 @@ class AppCard(QFrame):
     def _build(self, running: bool, reachable: bool) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(8)
+        layout.setSpacing(7)
 
         top = QHBoxLayout()
-        top.setSpacing(8)
+        top.setSpacing(10)
 
-        status_color = "#16a34a" if running else "#f59e0b" if reachable else "#94a3b8"
+        status_color = "#10B981" if running else "#F59E0B" if reachable else "#CBD2DD"
         status_icon = QLabel()
-        status_icon.setPixmap(build_dot(status_color))
-        top.addWidget(status_icon)
+        status_icon.setPixmap(build_dot(status_color, 9))
+        status_icon.setFixedWidth(10)
+        top.addWidget(status_icon, 0, Qt.AlignVCenter)
 
         name = QLabel(self.app.name)
-        name.setStyleSheet("font-size: 14px; font-weight: 700;")
+        name.setStyleSheet(
+            "font-size: 13.5px; font-weight: 600; color: #0F172A; letter-spacing: -0.1px;"
+        )
         name.setWordWrap(True)
         name.setMinimumWidth(0)
         top.addWidget(name, 1)
 
         if running:
-            status_text, badge = "RUNNING", "BadgeGreen"
+            status_text, badge = "Çalışıyor", "BadgeGreen"
         elif reachable:
-            status_text, badge = "REACHABLE", "BadgeOrange"
+            status_text, badge = "Erişilebilir", "BadgeOrange"
         else:
-            status_text, badge = "STOPPED", "BadgeGray"
+            status_text, badge = "Durdu", "BadgeGray"
         status = QLabel(status_text)
         status.setObjectName(badge)
-        top.addWidget(status)
+        top.addWidget(status, 0, Qt.AlignVCenter)
         layout.addLayout(top)
 
-        desc = QLabel(self.app.description or self.app.metadata.get("folder_name", ""))
-        desc.setWordWrap(True)
-        desc.setObjectName("MutedLabel")
-        layout.addWidget(desc)
+        desc_text = self.app.description or self.app.metadata.get("folder_name", "")
+        if desc_text:
+            desc = QLabel(desc_text)
+            desc.setWordWrap(True)
+            desc.setObjectName("MutedLabel")
+            desc.setStyleSheet("font-size: 12px; color: #64748B;")
+            layout.addWidget(desc)
 
         meta = QHBoxLayout()
+        meta.setSpacing(6)
         app_type = QLabel(self.app.app_type.upper())
-        app_type.setObjectName("BadgeBlue")
+        app_type.setObjectName("BadgeIndigo")
         meta.addWidget(app_type)
 
         mode = QLabel(self.app.start_mode)
         mode.setObjectName("BadgeGray")
         meta.addWidget(mode)
-
-        if reachable:
-            url_badge = QLabel("URL OK")
-            url_badge.setObjectName("BadgeOrange")
-            meta.addWidget(url_badge)
 
         meta.addStretch()
         layout.addLayout(meta)
@@ -298,6 +632,21 @@ class AppCard(QFrame):
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
         super().mousePressEvent(event)
         self.on_click(self.app.key)
+
+
+class NavButton(QPushButton):
+    def __init__(self, text: str, key: str, on_click: Callable[[str], None]) -> None:
+        super().__init__(text)
+        self.key = key
+        self.setObjectName("NavButton")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setProperty("active", False)
+        self.clicked.connect(lambda: on_click(key))
+
+    def set_active(self, active: bool) -> None:
+        self.setProperty("active", active)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 
 class MainWindow(QMainWindow):
@@ -320,93 +669,234 @@ class MainWindow(QMainWindow):
 
     def _build(self) -> None:
         self.setWindowTitle(APP_NAME)
-        self.setMinimumSize(1240, 800)
+        self.setMinimumSize(1280, 820)
         self.setStyleSheet(APP_STYLE)
         self.setWindowIcon(generate_tray_icon(64))
 
         root = QWidget()
-        root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(18, 18, 18, 18)
-        root_layout.setSpacing(16)
+        root.setObjectName("RootSurface")
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
-        header = QFrame()
-        header.setObjectName("Surface")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(18, 16, 18, 16)
+        sidebar = self._build_sidebar()
+        root_layout.addWidget(sidebar)
+
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+
+        self.header_bar = self._build_header_bar()
+        body_layout.addWidget(self.header_bar)
+
+        self.content_stack = QStackedWidget()
+        self.content_stack.setContentsMargins(0, 0, 0, 0)
+        body_layout.addWidget(self.content_stack, 1)
+
+        apps_view = self._build_apps_view()
+        self.content_stack.addWidget(apps_view)
+
+        self.projects_view = ProjectsView(self.state)
+        projects_wrapper = QWidget()
+        projects_wrapper_layout = QVBoxLayout(projects_wrapper)
+        projects_wrapper_layout.setContentsMargins(24, 18, 24, 24)
+        projects_wrapper_layout.setSpacing(0)
+        projects_wrapper_layout.addWidget(self.projects_view, 1)
+        self.content_stack.addWidget(projects_wrapper)
+
+        root_layout.addWidget(body, 1)
+
+        self.status_bar = QStatusBar()
+        self.status_bar.setSizeGripEnabled(False)
+        self.setStatusBar(self.status_bar)
+        self.setCentralWidget(root)
+
+        self._select_nav("apps")
+
+        for button in self.findChildren(QPushButton):
+            button.setCursor(Qt.PointingHandCursor)
+
+    def _build_sidebar(self) -> QFrame:
+        sidebar = QFrame()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(244)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(18, 22, 18, 18)
+        layout.setSpacing(6)
+
+        # Brand
+        brand_row = QHBoxLayout()
+        brand_row.setSpacing(10)
+        logo = QLabel()
+        logo.setPixmap(generate_brand_mark(28))
+        logo.setFixedSize(28, 28)
+        brand_row.addWidget(logo)
+
+        brand_col = QVBoxLayout()
+        brand_col.setSpacing(0)
+        brand_name = QLabel("Tools Hub")
+        brand_name.setObjectName("SidebarBrand")
+        brand_tag = QLabel("Local Workspace")
+        brand_tag.setObjectName("SidebarTagline")
+        brand_col.addWidget(brand_name)
+        brand_col.addWidget(brand_tag)
+        brand_row.addLayout(brand_col, 1)
+        brand_wrap = QWidget()
+        brand_wrap.setLayout(brand_row)
+        layout.addWidget(brand_wrap)
+
+        layout.addSpacing(20)
+
+        nav_label = QLabel("WORKSPACE")
+        nav_label.setObjectName("SidebarSection")
+        layout.addWidget(nav_label)
+
+        self.nav_buttons: dict[str, NavButton] = {}
+        apps_btn = NavButton("  Lokal Uygulamalar", "apps", self._select_nav)
+        services_btn = NavButton("  Servis URL'leri", "projects", self._select_nav)
+        layout.addWidget(apps_btn)
+        layout.addWidget(services_btn)
+        self.nav_buttons["apps"] = apps_btn
+        self.nav_buttons["projects"] = services_btn
+
+        layout.addSpacing(18)
+
+        actions_label = QLabel("ARAÇLAR")
+        actions_label.setObjectName("SidebarSection")
+        layout.addWidget(actions_label)
+
+        rescan_btn = QPushButton("  Yeniden Tara")
+        rescan_btn.setObjectName("SidebarAction")
+        rescan_btn.setCursor(Qt.PointingHandCursor)
+        rescan_btn.clicked.connect(self.refresh_apps)
+        layout.addWidget(rescan_btn)
+
+        tools_button = QToolButton()
+        tools_button.setObjectName("SidebarToolMenu")
+        tools_button.setText("  PID & Port  ▾")
+        tools_button.setPopupMode(QToolButton.InstantPopup)
+        tools_button.setCursor(Qt.PointingHandCursor)
+        tools_button.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        tools_menu = QMenu(tools_button)
+
+        pid_info_action = QAction("PID Bilgi", tools_menu)
+        pid_info_action.triggered.connect(self.prompt_pid_info)
+        tools_menu.addAction(pid_info_action)
+        port_info_action = QAction("Port Bilgi", tools_menu)
+        port_info_action.triggered.connect(self.prompt_port_info)
+        tools_menu.addAction(port_info_action)
+        tools_menu.addSeparator()
+        kill_pid_action = QAction("PID Kill", tools_menu)
+        kill_pid_action.triggered.connect(self.prompt_kill_pid)
+        tools_menu.addAction(kill_pid_action)
+        kill_port_action = QAction("Port Kill", tools_menu)
+        kill_port_action.triggered.connect(self.prompt_kill_port)
+        tools_menu.addAction(kill_port_action)
+        tools_button.setMenu(tools_menu)
+        layout.addWidget(tools_button)
+
+        layout.addStretch(1)
+
+        footer = QFrame()
+        footer.setObjectName("SidebarFooter")
+        footer_layout = QVBoxLayout(footer)
+        footer_layout.setContentsMargins(0, 14, 0, 0)
+        footer_layout.setSpacing(2)
+        hint = QLabel("Menubar'dan da erişebilirsin")
+        hint.setStyleSheet("color: #6B7280; font-size: 11px;")
+        footer_layout.addWidget(hint)
+        layout.addWidget(footer)
+
+        return sidebar
+
+    def _build_header_bar(self) -> QFrame:
+        bar = QFrame()
+        bar.setObjectName("HeaderBar")
+        bar.setFixedHeight(72)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(28, 16, 24, 16)
+        layout.setSpacing(16)
 
         title_col = QVBoxLayout()
-        title = QLabel("Tools Hub")
-        title.setObjectName("TitleLabel")
-        subtitle = QLabel("Tools klasorundeki uygulamalari tek yerden baslat, durdur ve izle.")
-        subtitle.setObjectName("MutedLabel")
-        title_col.addWidget(title)
-        title_col.addWidget(subtitle)
-        header_layout.addLayout(title_col)
-        header_layout.addStretch()
+        title_col.setSpacing(2)
+        self.header_title = QLabel("Lokal Uygulamalar")
+        self.header_title.setObjectName("HeaderTitle")
+        self.header_subtitle = QLabel("Tools klasöründeki uygulamaları başlat, durdur ve izle.")
+        self.header_subtitle.setObjectName("HeaderSubtitle")
+        title_col.addWidget(self.header_title)
+        title_col.addWidget(self.header_subtitle)
+        layout.addLayout(title_col)
+        layout.addStretch(1)
 
         self.summary_label = QLabel("")
-        self.summary_label.setObjectName("MutedLabel")
-        header_layout.addWidget(self.summary_label)
+        self.summary_label.setObjectName("FaintLabel")
+        self.summary_label.setStyleSheet("color: #64748B; font-size: 12px; font-weight: 500;")
+        layout.addWidget(self.summary_label)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Uygulama ara...")
-        self.search_input.setFixedWidth(260)
+        self.search_input.setObjectName("SearchInput")
+        self.search_input.setPlaceholderText("Uygulama ara…")
+        self.search_input.setFixedWidth(280)
+        self.search_input.setFixedHeight(36)
         self.search_input.textChanged.connect(self.refresh_app_list)
-        header_layout.addWidget(self.search_input)
+        layout.addWidget(self.search_input)
 
-        refresh_button = QPushButton("Yeniden Tara")
-        refresh_button.clicked.connect(self.refresh_apps)
-        header_layout.addWidget(refresh_button)
+        return bar
 
-        start_all_button = QPushButton("Start All")
+    def _build_apps_view(self) -> QWidget:
+        view = QWidget()
+        outer = QVBoxLayout(view)
+        outer.setContentsMargins(24, 18, 24, 24)
+        outer.setSpacing(14)
+
+        action_bar = QFrame()
+        action_bar_layout = QHBoxLayout(action_bar)
+        action_bar_layout.setContentsMargins(0, 0, 0, 0)
+        action_bar_layout.setSpacing(8)
+
+        action_bar_layout.addStretch(1)
+
+        start_all_button = QPushButton("Hepsini Başlat")
         start_all_button.setObjectName("PrimaryButton")
         start_all_button.clicked.connect(self.start_all_apps)
-        header_layout.addWidget(start_all_button)
+        action_bar_layout.addWidget(start_all_button)
 
-        stop_all_button = QPushButton("Stop All")
+        stop_all_button = QPushButton("Hepsini Durdur")
         stop_all_button.setObjectName("DangerButton")
         stop_all_button.clicked.connect(self.stop_all_apps)
-        header_layout.addWidget(stop_all_button)
+        action_bar_layout.addWidget(stop_all_button)
 
-        pid_info_button = QPushButton("PID Bilgi")
-        pid_info_button.clicked.connect(self.prompt_pid_info)
-        header_layout.addWidget(pid_info_button)
-
-        port_info_button = QPushButton("Port Bilgi")
-        port_info_button.clicked.connect(self.prompt_port_info)
-        header_layout.addWidget(port_info_button)
-
-        kill_pid_button = QPushButton("PID Kill")
-        kill_pid_button.clicked.connect(self.prompt_kill_pid)
-        header_layout.addWidget(kill_pid_button)
-
-        kill_port_button = QPushButton("Port Kill")
-        kill_port_button.clicked.connect(self.prompt_kill_port)
-        header_layout.addWidget(kill_port_button)
-
-        root_layout.addWidget(header)
+        outer.addWidget(action_bar)
 
         splitter = QSplitter()
         splitter.setChildrenCollapsible(False)
+        splitter.setHandleWidth(8)
 
         left = QFrame()
         left.setObjectName("Surface")
         left.setMinimumWidth(320)
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(16, 16, 16, 16)
+        left_layout.setContentsMargins(18, 18, 18, 14)
         left_layout.setSpacing(12)
 
-        list_title = QLabel("Tespit Edilen Uygulamalar")
+        list_header = QHBoxLayout()
+        list_title = QLabel("Uygulamalar")
         list_title.setObjectName("SectionLabel")
-        left_layout.addWidget(list_title)
+        list_header.addWidget(list_title)
+        list_header.addStretch()
+        self.list_count_label = QLabel("")
+        self.list_count_label.setObjectName("FaintLabel")
+        list_header.addWidget(self.list_count_label)
+        left_layout.addLayout(list_header)
 
         self.list_scroll = QScrollArea()
         self.list_scroll.setWidgetResizable(True)
         self.list_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list_container = QWidget()
         self.list_layout = QVBoxLayout(self.list_container)
-        self.list_layout.setContentsMargins(0, 0, 0, 0)
-        self.list_layout.setSpacing(12)
+        self.list_layout.setContentsMargins(0, 0, 4, 0)
+        self.list_layout.setSpacing(10)
         self.list_scroll.setWidget(self.list_container)
         left_layout.addWidget(self.list_scroll, 1)
 
@@ -415,114 +905,139 @@ class MainWindow(QMainWindow):
         right = QFrame()
         right.setObjectName("Surface")
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(16, 16, 16, 16)
-        right_layout.setSpacing(12)
+        right_layout.setContentsMargins(22, 22, 22, 22)
+        right_layout.setSpacing(18)
 
-        detail_title = QLabel("Detay ve Kontrol")
-        detail_title.setObjectName("SectionLabel")
-        right_layout.addWidget(detail_title)
-
-        self.detail_card = QFrame()
-        self.detail_card.setObjectName("DetailCard")
-        detail_layout = QVBoxLayout(self.detail_card)
-        detail_layout.setContentsMargins(18, 18, 18, 18)
-        detail_layout.setSpacing(12)
-
+        # ---- Header block (name + status) ----
         name_row = QHBoxLayout()
-        self.app_name_label = QLabel("Uygulama Sec")
-        self.app_name_label.setStyleSheet("font-size: 22px; font-weight: 700;")
+        name_row.setSpacing(12)
+        self.app_name_label = QLabel("Uygulama Seç")
+        self.app_name_label.setStyleSheet(
+            "font-size: 22px; font-weight: 700; color: #0F172A; letter-spacing: -0.4px;"
+        )
         name_row.addWidget(self.app_name_label)
         name_row.addStretch()
-        self.status_badge = QLabel("READY")
+        self.status_badge = QLabel("Hazır")
         self.status_badge.setObjectName("BadgeGray")
         name_row.addWidget(self.status_badge)
-        detail_layout.addLayout(name_row)
+        right_layout.addLayout(name_row)
 
-        self.description_label = QLabel("Soldan bir uygulama sec.")
+        self.description_label = QLabel("Soldan bir uygulama seç.")
         self.description_label.setWordWrap(True)
         self.description_label.setObjectName("MutedLabel")
-        detail_layout.addWidget(self.description_label)
+        self.description_label.setStyleSheet("font-size: 13px; color: #475569;")
+        right_layout.addWidget(self.description_label)
 
+        # ---- Stat strip ----
+        stat_strip = QFrame()
+        stat_strip.setObjectName("InsetPanel")
+        stat_layout = QHBoxLayout(stat_strip)
+        stat_layout.setContentsMargins(16, 12, 16, 12)
+        stat_layout.setSpacing(20)
         self.meta_label = QLabel("")
         self.meta_label.setWordWrap(True)
-        self.meta_label.setObjectName("MutedLabel")
-        detail_layout.addWidget(self.meta_label)
+        self.meta_label.setStyleSheet(
+            "color: #475569; font-size: 12px; line-height: 1.55;"
+        )
+        stat_layout.addWidget(self.meta_label, 1)
+        right_layout.addWidget(stat_strip)
+
+        # ---- URL row ----
+        url_label = QLabel("URL")
+        url_label.setObjectName("GroupLabel")
+        right_layout.addWidget(url_label)
 
         url_row = QHBoxLayout()
+        url_row.setSpacing(8)
         self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("URL yaz veya otomatik tespit edilen URL'yi duzenle")
-        url_row.addWidget(self.url_input)
-
-        save_url_button = QPushButton("URL Kaydet")
+        self.url_input.setPlaceholderText("URL yaz veya otomatik tespit edilen URL'yi düzenle")
+        url_row.addWidget(self.url_input, 1)
+        save_url_button = QPushButton("Kaydet")
         save_url_button.clicked.connect(self.save_url_override)
         url_row.addWidget(save_url_button)
-        detail_layout.addLayout(url_row)
+        right_layout.addLayout(url_row)
 
-        action_row = QHBoxLayout()
-        self.start_button = QPushButton("Start")
-        self.start_button.setObjectName("PrimaryButton")
-        self.start_button.clicked.connect(self.start_selected_app)
-        action_row.addWidget(self.start_button)
+        # ---- Lifecycle ----
+        lifecycle_label = QLabel("YAŞAM DÖNGÜSÜ")
+        lifecycle_label.setObjectName("GroupLabel")
+        right_layout.addWidget(lifecycle_label)
 
-        self.open_button = QPushButton("Ac")
+        lifecycle_row = QHBoxLayout()
+        lifecycle_row.setSpacing(8)
+        self.open_button = QPushButton("Aç")
         self.open_button.setObjectName("PrimaryButton")
         self.open_button.clicked.connect(self.open_selected_app)
-        action_row.addWidget(self.open_button)
+        lifecycle_row.addWidget(self.open_button)
 
-        self.stop_button = QPushButton("Stop")
+        self.start_button = QPushButton("Başlat")
+        self.start_button.setObjectName("PrimaryButton")
+        self.start_button.clicked.connect(self.start_selected_app)
+        lifecycle_row.addWidget(self.start_button)
+
+        self.stop_button = QPushButton("Durdur")
         self.stop_button.setObjectName("DangerButton")
         self.stop_button.clicked.connect(self.stop_selected_app)
-        action_row.addWidget(self.stop_button)
+        lifecycle_row.addWidget(self.stop_button)
 
-        self.restart_button = QPushButton("Restart")
+        self.restart_button = QPushButton("Yeniden Başlat")
         self.restart_button.clicked.connect(self.restart_selected_app)
-        action_row.addWidget(self.restart_button)
+        lifecycle_row.addWidget(self.restart_button)
+        lifecycle_row.addStretch()
+        right_layout.addLayout(lifecycle_row)
 
-        self.open_url_button = QPushButton("URL Ac")
+        # ---- Access ----
+        access_label = QLabel("ERİŞİM & KAYNAKLAR")
+        access_label.setObjectName("GroupLabel")
+        right_layout.addWidget(access_label)
+
+        access_row = QHBoxLayout()
+        access_row.setSpacing(8)
+        self.open_url_button = QPushButton("URL Aç")
         self.open_url_button.clicked.connect(self.open_selected_url)
-        action_row.addWidget(self.open_url_button)
+        access_row.addWidget(self.open_url_button)
 
-        self.open_terminal_button = QPushButton("Terminal Ac")
+        self.open_terminal_button = QPushButton("Terminal")
         self.open_terminal_button.clicked.connect(self.open_selected_terminal)
-        action_row.addWidget(self.open_terminal_button)
+        access_row.addWidget(self.open_terminal_button)
+
+        self.open_folder_button = QPushButton("Klasör")
+        self.open_folder_button.clicked.connect(self.open_selected_folder)
+        access_row.addWidget(self.open_folder_button)
+
+        self.open_logs_button = QPushButton("Loglar")
+        self.open_logs_button.clicked.connect(self.open_selected_logs)
+        access_row.addWidget(self.open_logs_button)
+
+        self.open_readme_button = QPushButton("README")
+        self.open_readme_button.clicked.connect(self.open_selected_readme)
+        access_row.addWidget(self.open_readme_button)
 
         self.health_check_button = QPushButton("Health Check")
         self.health_check_button.clicked.connect(self.show_selected_health_check)
-        action_row.addWidget(self.health_check_button)
+        access_row.addWidget(self.health_check_button)
 
-        self.open_folder_button = QPushButton("Klasor Ac")
-        self.open_folder_button.clicked.connect(self.open_selected_folder)
-        action_row.addWidget(self.open_folder_button)
+        access_row.addStretch()
+        right_layout.addLayout(access_row)
 
-        self.open_logs_button = QPushButton("Log Ac")
-        self.open_logs_button.clicked.connect(self.open_selected_logs)
-        action_row.addWidget(self.open_logs_button)
-
-        self.open_readme_button = QPushButton("README Ac")
-        self.open_readme_button.clicked.connect(self.open_selected_readme)
-        action_row.addWidget(self.open_readme_button)
-
-        action_row.addStretch()
-        detail_layout.addLayout(action_row)
-
-        command_title = QLabel("Baslatma Komutu")
-        command_title.setObjectName("SectionLabel")
-        detail_layout.addWidget(command_title)
+        # ---- Command preview ----
+        command_title = QLabel("BAŞLATMA KOMUTU")
+        command_title.setObjectName("GroupLabel")
+        right_layout.addWidget(command_title)
 
         self.command_preview = QPlainTextEdit()
         self.command_preview.setReadOnly(True)
-        self.command_preview.setFixedHeight(78)
-        detail_layout.addWidget(self.command_preview)
+        self.command_preview.setFixedHeight(64)
+        right_layout.addWidget(self.command_preview)
 
-        logs_title = QLabel("Log Onizlemesi")
-        logs_title.setObjectName("SectionLabel")
-        detail_layout.addWidget(logs_title)
+        # ---- Logs ----
+        logs_title = QLabel("LOG ÖNİZLEMESİ")
+        logs_title.setObjectName("GroupLabel")
+        right_layout.addWidget(logs_title)
 
         self.logs_preview = QPlainTextEdit()
         self.logs_preview.setReadOnly(True)
-        detail_layout.addWidget(self.logs_preview, 1)
+        right_layout.addWidget(self.logs_preview, 1)
 
-        right_layout.addWidget(self.detail_card, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 2)
         splitter.setStretchFactor(1, 5)
@@ -530,14 +1045,29 @@ class MainWindow(QMainWindow):
         self.splitter = splitter
         splitter.splitterMoved.connect(self._on_splitter_moved)
 
-        root_layout.addWidget(splitter, 1)
+        outer.addWidget(splitter, 1)
+        return view
 
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        self.setCentralWidget(root)
+    def _select_nav(self, key: str) -> None:
+        for nav_key, btn in self.nav_buttons.items():
+            btn.set_active(nav_key == key)
 
-        for button in self.findChildren(QPushButton):
-            button.setCursor(Qt.PointingHandCursor)
+        if key == "apps":
+            self.content_stack.setCurrentIndex(0)
+            self.header_title.setText("Lokal Uygulamalar")
+            self.header_subtitle.setText(
+                "Tools klasöründeki uygulamaları başlat, durdur ve izle."
+            )
+            self.search_input.setVisible(True)
+            self.summary_label.setVisible(True)
+        else:
+            self.content_stack.setCurrentIndex(1)
+            self.header_title.setText("Servis URL'leri")
+            self.header_subtitle.setText(
+                "Projelerinin Swagger ve Hangfire URL'lerini ortamlara göre yönet."
+            )
+            self.search_input.setVisible(False)
+            self.summary_label.setVisible(False)
 
     def _create_tray_icon(self) -> None:
         self.tray_icon = QSystemTrayIcon(generate_tray_icon())
@@ -687,7 +1217,12 @@ class MainWindow(QMainWindow):
             self.list_layout.addWidget(empty)
 
         self.list_layout.addStretch()
-        self.summary_label.setText(f"{running_count} calisan | {len(self.apps)} toplam uygulama")
+        total = len(self.apps)
+        self.summary_label.setText(
+            f"{running_count} aktif  ·  {total} uygulama" if total else "Henüz uygulama yok"
+        )
+        if hasattr(self, "list_count_label"):
+            self.list_count_label.setText(f"{len(visible_apps)}/{total}")
 
     def select_app(self, app_key: str) -> None:
         self.selected_key = app_key
@@ -704,13 +1239,13 @@ class MainWindow(QMainWindow):
     def refresh_details(self) -> None:
         app = self.get_selected_app()
         if not app:
-            self.app_name_label.setText("Uygulama Sec")
-            self.description_label.setText("Detay gormek icin soldan bir uygulama sec.")
+            self.app_name_label.setText("Uygulama Seç")
+            self.description_label.setText("Detay görmek için soldan bir uygulama seç.")
             self.meta_label.setText("")
             self.url_input.setText("")
             self.command_preview.setPlainText("")
             self.logs_preview.setPlainText("")
-            self.status_badge.setText("READY")
+            self.status_badge.setText("Hazır")
             self.status_badge.setObjectName("BadgeGray")
             self.status_badge.style().unpolish(self.status_badge)
             self.status_badge.style().polish(self.status_badge)
@@ -721,25 +1256,25 @@ class MainWindow(QMainWindow):
         resolved_url = self.manager.get_url(app)
         reachable = bool(resolved_url and is_url_reachable(resolved_url))
 
-        status_text = "RUNNING" if running else "REACHABLE" if reachable else "STOPPED"
+        status_text = "Çalışıyor" if running else "Erişilebilir" if reachable else "Durdu"
         badge_name = "BadgeGreen" if running else "BadgeOrange" if reachable else "BadgeGray"
 
         self.app_name_label.setText(app.name)
         self.description_label.setText(
-            app.description or "Bu uygulama icin aciklama bulunamadi."
+            app.description or "Bu uygulama için açıklama bulunamadı."
         )
         self.meta_label.setText(
-            "\n".join(
+            "    ".join(
                 [
-                    f"Tip: {app.app_type}",
-                    f"Klasor: {app.path}",
-                    f"Start yontemi: {app.start_mode}",
-                    f"PID: {runtime.pid or '-'}",
-                    f"Son baslatma: {format_dt(runtime.started_at)}",
-                    f"URL erisimi: {'OK' if reachable else 'Yok'}",
+                    f"Tip: <b>{app.app_type}</b>",
+                    f"Mod: <b>{app.start_mode}</b>",
+                    f"PID: <b>{runtime.pid or '—'}</b>",
+                    f"URL: <b>{'OK' if reachable else 'Yok'}</b>",
+                    f"Son başlatma: <b>{format_dt(runtime.started_at) or '—'}</b>",
                 ]
             )
         )
+        self.meta_label.setTextFormat(Qt.RichText)
 
         current_url_text = self.url_input.text().strip()
         if self.url_input.hasFocus():
