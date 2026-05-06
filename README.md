@@ -18,12 +18,14 @@ lokalde tutulur.
 | Arac | Tip | Ne ise yarar |
 |------|-----|--------------|
 | [tools-hub](#tools-hub) | PySide6 desktop | Bu repodaki araclari tek pencereden baslat, durdur, URL ac, log incele, PID/port kill yap |
+| [window-pinner-menubar](#window-pinner-menubar) | Swift menubar | Aktif macOS penceresini hotkey ile hep ustte tut, sonra normal gibi tasi ve yeniden boyutlandir |
 
 ```
 Tools/
 ├── start.command            # tools-hub launcher'i acar
 ├── stop.command
 ├── tools-hub/               # arac yoneticisi
+├── window-pinner-menubar/   # aktif pencereyi ustte tutan macOS yardimci araci
 ├── clipboard-keeper/        # menubar clipboard manager
 └── fordeveloper/            # workspace dashboard (Flask)
 ```
@@ -69,6 +71,27 @@ Tools klasorunu tarayan, alt klasorlerdeki `start.command` / `app.py` /
 ```
 
 Durum dosyasi: `~/Library/Application Support/ToolsHub/state.json`
+
+---
+
+## window-pinner-menubar
+
+Menubar'da calisan, aktif macOS penceresini hotkey ile pinleyen kucuk bir arac.
+
+**Ozellikler:**
+
+- `Control + Option + Command + P` ile aktif pencereyi pinler
+- `Control + Option + Command + U` ile pin'i kaldirir
+- Pinlenen pencereyi normal pencere gibi tasiyip yeniden boyutlandirabilirsin
+- Cikis yaparken pencere seviyesini eski haline geri alir
+- `Accessibility` izni ister
+
+**Calistirma:**
+
+```bash
+cd window-pinner-menubar
+./start.command
+```
 
 ---
 

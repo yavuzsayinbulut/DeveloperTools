@@ -40,3 +40,7 @@ clipboard-keeper/launchd.err.log
 # ─── tools-hub runtime ──────────────────────────────────
 tools-hub/.state/
 tools-hub/*.log
+
+# ─── window-pinner-menubar build artifacts ──────────────
+window-pinner-menubar/.build/
+window-pinner-menubar/dist/
