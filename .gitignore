@@ -44,3 +44,7 @@ tools-hub/*.log
 # ─── window-pinner-menubar build artifacts ──────────────
 window-pinner-menubar/.build/
 window-pinner-menubar/dist/
+
+# ─── keep-awake-menubar build artifacts ─────────────────
+keep-awake-menubar/.build/
+keep-awake-menubar/dist/
