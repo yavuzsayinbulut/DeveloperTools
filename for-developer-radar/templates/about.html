@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Hakkinda{% endblock %}
+{% block page_title %}Hakkinda{% endblock %}
+
+{% block content %}
+<div class="about-page">
+
+    <!-- Hero -->
+    <div class="about-hero">
+        <div class="about-hero-logo">DT</div>
+        <h1 class="about-hero-title">Delivery Radar</h1>
+        <p class="about-hero-subtitle">Development Dashboard &amp; Deployment Tracker</p>
+        <div class="about-hero-meta">
+            <span class="about-ver">v2.0</span>
+            <span class="about-sep">&middot;</span>
+            <span>made by <strong class="about-author">feanor</strong></span>
+            <span class="about-sep">&middot;</span>
+            <span>for <strong>Yavuz</strong></span>
+        </div>
+    </div>
+
+    <!-- Live Stats -->
+    <div class="about-stats">
+        <div class="about-stat-card">
+            <span class="about-stat-val">{{ stats.indexed_files }}</span>
+            <span class="about-stat-label">Indexli Dosya</span>
+        </div>
+        <div class="about-stat-card">
+            <span class="about-stat-val">{{ stats.deployments }}</span>
+            <span class="about-stat-label">Deployment</span>
+        </div>
+        <div class="about-stat-card">
+            <span class="about-stat-val">{{ stats.repos }}</span>
+            <span class="about-stat-label">Repo</span>
+        </div>
+        <div class="about-stat-card">
+            <span class="about-stat-val">{{ stats.tasks }}</span>
+            <span class="about-stat-label">Task</span>
+        </div>
+        <div class="about-stat-card">
+            <span class="about-stat-val">{{ stats.daily_notes }}</span>
+            <span class="about-stat-label">Daily Note</span>
+        </div>
+        <div class="about-stat-card">
+            <span class="about-stat-val">{{ stats.activity_logs }}</span>
+            <span class="about-stat-label">Aktivite Logu</span>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="about-section">
+        <h2 class="about-section-title">Ozellikler</h2>
+        <div class="about-features">
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-deploy">&#9650;</div>
+                <h3>Deployment Yonetimi</h3>
+                <p>DEPLOYMENT_LOG.md'den otomatik import. Gelecek/Son ayrimi. Surukle-birak ile status degisikligi. Markdown kopyalama. Detay sayfasi.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-chart">&#9672;</div>
+                <h3>Grafikler & Istatistikler</h3>
+                <p>Haftalik/Aylik/3 Ay/Yillik deployment grafigi. Donut chart ile status dagilimi. Repo bazli breakdown. Bar'a tikla - detay ac.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-insight">&#9888;</div>
+                <h3>Akilli Bildirimler</h3>
+                <p>Deployment gunu uyarisi, test merge eksik, gecmis hatirlatma, stale task, haftalik ozet. Pop-up toast + bildirim paneli + dashboard banner.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-kanban">&#9654;</div>
+                <h3>Task Board</h3>
+                <p>Kanban gorunumu: TODO, IN_PROGRESS, IN_REVIEW, DONE, ARCHIVED. Surukle-birak, oncelik, kategori, JIRA/MR link.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-search">&#8981;</div>
+                <h3>Search & Trace</h3>
+                <p>Full-text arama. TCO-XXXX trace ile task timeline. PLAN_AND_ANALYSIS, DEVELOPMENT dosyalarinin icerigini goruntuleme.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-repo">&#9670;</div>
+                <h3>Repo Istatistikleri</h3>
+                <p>Onboarding, FieldAndDevice gibi repo gruplari bazinda deployment sayisi. Filtreleme, trend analizi.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-remind">&#9733;</div>
+                <h3>Hatirlatmalar</h3>
+                <p>Tek seferlik, gunluk, hafta ici, Sali-Persembe, haftalik tekrar. macOS native bildirim. Task'a bagli hatirlatma.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-note">&#9998;</div>
+                <h3>Daily Notes</h3>
+                <p>Gun bazli markdown not defteri. Tag sistemi. Otomatik hatirlatma.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-docs">&#9776;</div>
+                <h3>Dokuman Tarayici</h3>
+                <p>Workspace'teki tum .md dosyalarini syntax highlighting ile goruntuleme. Kategori filtreleme. TOC navigasyon.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-security">&#9919;</div>
+                <h3>Guvenlik</h3>
+                <p>Machine-bound calisma (Hardware UUID + Serial). PIN login. AES-256 sifreleme. Cryptographic session token. Her endpoint korumalı.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-anim">&#10070;</div>
+                <h3>Hacker Animasyonlari</h3>
+                <p>4 fazli boot splash (matrix rain, terminal, glitch text, welcome). Sayfa gecislerinde matrix transition. Login ekrani matrix bg. CRT scanline efektleri.</p>
+            </div>
+
+            <div class="about-feature">
+                <div class="about-feature-icon af-auto">&#8635;</div>
+                <h3>Otomatik Islemler</h3>
+                <p>30 dk'da bir MD tarama + deployment sync. Sabah brifingi, deployment gunu uyarisi, daily note hatirlatma. APScheduler ile background job.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Tech Stack -->
+    <div class="about-section">
+        <h2 class="about-section-title">Teknoloji</h2>
+        <div class="about-tech-grid">
+            <div class="about-tech">
+                <div class="about-tech-name">Python Flask</div>
+                <div class="about-tech-desc">Web framework, routing, template engine</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">SQLite + SQLAlchemy</div>
+                <div class="about-tech-desc">Yerel veritabani, ORM, migration-free schema</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">APScheduler</div>
+                <div class="about-tech-desc">Background job scheduling, cron-style triggers</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">Fernet (AES-256-CBC)</div>
+                <div class="about-tech-desc">Symmetric encryption, PBKDF2 key derivation</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">HMAC-SHA256</div>
+                <div class="about-tech-desc">Machine fingerprint, PIN hash, session validation</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">HTML5 Canvas</div>
+                <div class="about-tech-desc">Matrix rain animation, transition efektleri</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">CSS3 Animations</div>
+                <div class="about-tech-desc">Glitch, glow, scanline, fade, slide, pulse efektleri</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">Drag & Drop API</div>
+                <div class="about-tech-desc">Deployment kanban, task board surukle-birak</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">Clipboard API</div>
+                <div class="about-tech-desc">Click-to-copy, markdown kopyalama</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">macOS LaunchAgent</div>
+                <div class="about-tech-desc">Sistem servisi, auto-start, crash recovery</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">terminal-notifier</div>
+                <div class="about-tech-desc">macOS native bildirim sistemi</div>
+            </div>
+            <div class="about-tech">
+                <div class="about-tech-name">Jinja2 + Markdown</div>
+                <div class="about-tech-desc">Template rendering, .md parse, syntax highlighting</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts -->
+    <div class="about-section">
+        <h2 class="about-section-title">Kisayollar</h2>
+        <div class="about-shortcuts">
+            <div class="about-shortcut">
+                <kbd>Cmd</kbd> + <kbd>K</kbd>
+                <span>Global arama</span>
+            </div>
+            <div class="about-shortcut">
+                <kbd>Esc</kbd>
+                <span>Modal kapat</span>
+            </div>
+            <div class="about-shortcut">
+                <kbd>Click</kbd> TCO badge
+                <span>TCO numarasi kopyala</span>
+            </div>
+            <div class="about-shortcut">
+                <kbd>Click</kbd> Baslik
+                <span>Deployment detayina git</span>
+            </div>
+            <div class="about-shortcut">
+                <kbd>Drag</kbd> Kart
+                <span>Deployment status degistir</span>
+            </div>
+            <div class="about-shortcut">
+                <kbd>Click</kbd> Status badge
+                <span>Status popup ac</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="about-section">
+        <h2 class="about-section-title">Mimari</h2>
+        <div class="about-arch">
+            <pre class="about-arch-diagram">
+  DEPLOYMENT_LOG.md ──> parser.py ──> FutureDeployment (SQLite)
+                                           |
+  .md files ──> search_engine.py ──> MdIndex (SQLite)
+                                           |
+  ┌────────────────────────────────────────┤
+  |           Flask Application            |
+  |                                        |
+  |  Dashboard ── Grafikler ── Insights    |
+  |  Deployments ── Kanban ── Drag&Drop    |
+  |  Tasks ── Reminders ── Daily Notes     |
+  |  Search/Trace ── Docs ── Settings      |
+  |                                        |
+  |  security.py ── Machine Bind ── AES    |
+  |  scheduler.py ── 30m Sync ── Notify    |
+  └────────────────────────────────────────┘
+           |              |
+     127.0.0.1:5556    LaunchAgent
+           |              |
+       Browser        macOS Notify</pre>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="about-footer">
+        <div class="about-footer-logo">DT</div>
+        <p>Delivery Radar v0.1</p>
+        <p class="about-footer-sub">Odeal Development Team icin kisisel gelistirici paneli</p>
+        <p class="about-footer-author">made by <span class="about-author">feanor</span> for <strong>Yavuz</strong></p>
+    </div>
+
+</div>
+{% endblock %}

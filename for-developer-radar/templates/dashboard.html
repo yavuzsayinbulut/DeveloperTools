@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Smart Tips (loaded dynamically via JS) -->
+<div class="smart-tips" id="dashSmartTips"></div>
+
+<!-- Status Bar -->
+<div class="status-bar">
+    <div class="status-card {% if is_deploy_today %}status-alert{% endif %}">
+        <div class="status-icon">&#9650;</div>
+        <div class="status-info">
+            {% if is_deploy_today %}
+                <span class="status-label">BUGUN DEPLOYMENT GUNU!</span>
+            {% elif days_until == 1 %}
+                <span class="status-label">Yarin Deployment</span>
+            {% else %}
+                <span class="status-label">Sonraki Deploy ({{ days_until }} gun)</span>
+            {% endif %}
+            <span class="status-value">{{ next_deploy_day }} - {{ next_deploy.strftime('%d %b') }}</span>
+        </div>
+    </div>
+    <div class="status-card">
+        <div class="status-icon">&#9652;</div>
+        <div class="status-info">
+            <span class="status-label">Deploy Bekleyen</span>
+            <span class="status-value">{{ upcoming_deployments|length }}</span>
+        </div>
+    </div>
+    <div class="status-card">
+        <div class="status-icon">&#9733;</div>
+        <div class="status-info">
+            <span class="status-label">Bugunun Hatirlatmalari</span>
+            <span class="status-value">{{ today_reminders|length }}</span>
+        </div>
+    </div>
+    <div class="status-card">
+        <div class="status-icon">&#9998;</div>
+        <div class="status-info">
+            <span class="status-label">Daily Note</span>
+            <span class="status-value">{% if daily_note and daily_note.content %}Yazildi{% else %}Henuz yok{% endif %}</span>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- Charts Card -->
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3>Grafikler</h3>
+            <div class="chart-range-tabs">
+                <button class="tab active" onclick="loadDashChart('week', this)">Hafta</button>
+                <button class="tab" onclick="loadDashChart('month', this)">Ay</button>
+                <button class="tab" onclick="loadDashChart('3month', this)">3 Ay</button>
+                <button class="tab" onclick="loadDashChart('year', this)">Yil</button>
+            </div>
+        </div>
+        <div class="dash-charts-row">
+            <div class="dash-chart-box">
+                <div class="dash-chart-title">Deployment Sayisi</div>
+                <div id="dashChartBars"><p class="empty-state">Yukleniyor...</p></div>
+            </div>
+            <div class="dash-chart-box">
+                <div class="dash-chart-title">Status Dagilimi</div>
+                <div id="dashChartDonut"></div>
+            </div>
+            <div class="dash-chart-box">
+                <div class="dash-chart-title">Repo Dagilimi</div>
+                <div id="dashChartRepos"></div>
+            </div>
+        </div>
+        <div class="dash-chart-detail" id="dashChartDetail"></div>
+    </div>
+
+    <!-- Team & Repo Pulse -->
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3>Team & Repo Pulse</h3>
+            <a href="/team-pulse" class="card-link">Detay &rarr;</a>
+        </div>
+        <div id="teamRepoPulseCard">
+            <p class="empty-state">Git hareketi yukleniyor...</p>
+        </div>
+    </div>
+
+    <!-- Follow-up Radar -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Follow-up Radar</h3>
+        </div>
+        <div id="followUpRadarCard">
+            <p class="empty-state">Radar hesaplanıyor...</p>
+        </div>
+    </div>
+
+    <!-- Decision Memory -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Decision Memory</h3>
+        </div>
+        <div id="decisionMemoryCard">
+            <p class="empty-state">Karar hafizasi yukleniyor...</p>
+        </div>
+    </div>
+
+    <!-- Upcoming Deployments -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Gelecek Deploymentlar</h3>
+            <a href="/upcoming-deployments" class="card-link">Tumu &rarr;</a>
+        </div>
+        {% if upcoming_deployments %}
+        <ul class="deploy-list">
+            {% for fd in upcoming_deployments[:5] %}
+            <li class="deploy-item">
+                <span class="deploy-date">{{ fd.date }}</span>
+                <span class="badge badge-fd-bekliyor-sm status-toggle" onclick="openStatusPopup(event, {{ fd.id }}, 'bekliyor')" title="Tikla: status degistir">Bekliyor</span>
+                <span class="deploy-task badge badge-task clickable-copy" data-copy="{{ fd.task }}" title="Tikla: kopyala">{{ fd.task }}</span>
+                <a href="/deployment/{{ fd.id }}" class="deploy-title">{{ fd.title[:40] }}</a>
+                {% if fd.jira_url %}
+                <a href="{{ fd.jira_url }}" target="_blank" class="link-icon" title="JIRA ac">J</a>
+                {% endif %}
+                <button class="btn-icon" onclick="copyFdMarkdown({{ fd.id }})" title="Tamamini Kopyala">&#9112;</button>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">Bekleyen deployment yok.</p>
+        {% endif %}
+    </div>
+
+    <!-- Recent Deployments -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Son Deploymentlar</h3>
+            <a href="/deployments" class="card-link">Tumu &rarr;</a>
+        </div>
+        {% if completed_deployments %}
+        <ul class="deploy-list">
+            {% for fd in completed_deployments %}
+            <li class="deploy-item">
+                <span class="deploy-date">{{ fd.date }}</span>
+                <span class="badge badge-fd-tamamlandi-sm status-toggle" onclick="openStatusPopup(event, {{ fd.id }}, 'tamamlandi')" title="Tikla: status degistir">OK</span>
+                <span class="deploy-task badge badge-task clickable-copy" data-copy="{{ fd.task }}" title="Tikla: kopyala">{{ fd.task }}</span>
+                <a href="/deployment/{{ fd.id }}" class="deploy-title">{{ fd.title[:40] }}</a>
+                {% if fd.jira_url %}
+                <a href="{{ fd.jira_url }}" target="_blank" class="link-icon" title="JIRA ac">J</a>
+                {% endif %}
+                <button class="btn-icon" onclick="copyFdMarkdown({{ fd.id }})" title="Tamamini Kopyala">&#9112;</button>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">Tamamlanan deployment yok.</p>
+        {% endif %}
+    </div>
+
+    <!-- Sprint Overview -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Sprint Overview</h3>
+            <a href="/tasks" class="card-link">Tumu &rarr;</a>
+        </div>
+        <div class="sprint-bars">
+            {% set total_tasks = tasks_by_status.get('TODO', 0) + tasks_by_status.get('IN_PROGRESS', 0) + tasks_by_status.get('IN_REVIEW', 0) + tasks_by_status.get('DONE', 0) + 1 %}
+            {% for key, label, cls in [('TODO','TODO','fill-todo'),('IN_PROGRESS','IN PROGRESS','fill-progress'),('IN_REVIEW','IN REVIEW','fill-review'),('DONE','DONE','fill-done')] %}
+            <div class="sprint-row">
+                <span class="sprint-label">{{ label }}</span>
+                <div class="sprint-bar"><div class="sprint-fill {{ cls }}" style="width: {{ (tasks_by_status.get(key, 0) * 100 / total_tasks) | int }}%"></div></div>
+                <span class="sprint-count">{{ tasks_by_status.get(key, 0) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Today's Reminders -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Bugunun Hatirlatmalari</h3>
+            <a href="/reminders" class="card-link">Tumu &rarr;</a>
+        </div>
+        {% if today_reminders %}
+        <ul class="reminder-list">
+            {% for r in today_reminders %}
+            <li class="reminder-item">
+                <span class="reminder-time">{{ r.remind_at.strftime('%H:%M') }}</span>
+                <span class="reminder-cat badge badge-{{ r.category }}">{{ r.category }}</span>
+                <span class="reminder-text">{{ r.note[:80] }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">Bugun icin hatirlatma yok.</p>
+        {% endif %}
+        <button class="btn btn-sm btn-primary" onclick="openQuickReminder()">+ Hatirlatma Ekle</button>
+    </div>
+
+    <!-- Active Tasks -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Aktif Tasklar</h3>
+            <a href="/tasks" class="card-link">Tumu &rarr;</a>
+        </div>
+        {% if active_tasks %}
+        <ul class="task-list">
+            {% for t in active_tasks[:6] %}
+            <li class="task-item">
+                <span class="task-status badge badge-{{ t.status|lower }}">{{ t.status }}</span>
+                <span class="task-priority priority-{{ t.priority }}"></span>
+                {% if t.tco_number %}<span class="task-tco">{{ t.tco_number }}</span>{% endif %}
+                <span class="task-title">{{ t.title[:40] }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">Aktif task yok.</p>
+        {% endif %}
+        <button class="btn btn-sm btn-primary" onclick="openQuickTask()">+ Task Ekle</button>
+    </div>
+
+    <!-- TCO Intelligence -->
+    <div class="card">
+        <div class="card-header">
+            <h3>TCO Intelligence</h3>
+        </div>
+        <div class="tco-intelligence-quick">
+            <div class="tco-intelligence-form">
+                <input type="text" id="dashTcoInput" class="form-input" placeholder="TCO-XXXX yaz ve analiz et">
+                <button class="btn btn-primary btn-sm" onclick="runDashboardTcoIntelligence()">Analiz</button>
+            </div>
+            <div class="tco-intelligence-hint">Task, deploy, karar hafizasi ve git izi tek yerde gorunur.</div>
+            <div id="dashTcoIntelligenceResult">
+                <p class="empty-state">Bir TCO yazarak akilli ozet alabilirsin.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Note -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Bugunun Notu</h3>
+            <a href="/daily-notes" class="card-link">Tumu &rarr;</a>
+        </div>
+        {% if daily_note and daily_note.content %}
+        <div class="daily-preview">{{ daily_note.content[:300] }}</div>
+        {% else %}
+        <p class="empty-state">Bugun icin not yazilmamis.</p>
+        {% endif %}
+        <a href="/daily-notes" class="btn btn-sm btn-primary">{{ 'Duzenle' if daily_note else 'Not Yaz' }}</a>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Son Aktivite</h3>
+            <span class="card-meta">{{ indexed_count }} dosya indexli</span>
+        </div>
+        {% if recent_activity %}
+        <ul class="activity-list">
+            {% for a in recent_activity %}
+            <li class="activity-item">
+                <span class="activity-time">{{ a.created_at.strftime('%d/%m %H:%M') }}</span>
+                <span class="activity-desc">{{ a.description[:60] }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">Henuz aktivite yok.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Reminder Modal -->
+<div class="modal" id="quickReminderModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Hizli Hatirlatma</h3>
+            <button class="modal-close" onclick="closeModal('quickReminderModal')">&times;</button>
+        </div>
+        <form onsubmit="saveQuickReminder(event)">
+            <div class="form-group">
+                <label>Not</label>
+                <input type="text" id="qr_note" class="form-input" required placeholder="Hatirlatma notu...">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tarih & Saat</label>
+                    <input type="datetime-local" id="qr_remind_at" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="qr_category" class="form-input">
+                        <option value="genel">Genel</option>
+                        <option value="deployment">Deployment</option>
+                        <option value="task">Task</option>
+                        <option value="review">Review</option>
+                        <option value="meeting">Meeting</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Tekrar</label>
+                <select id="qr_recurrence" class="form-input">
+                    <option value="once">Bir Kez</option>
+                    <option value="daily">Her Gun</option>
+                    <option value="weekdays">Hafta Ici</option>
+                    <option value="tue_thu">Sali & Persembe</option>
+                    <option value="weekly">Haftalik</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </form>
+    </div>
+</div>
+
+<!-- Quick Task Modal -->
+<div class="modal" id="quickTaskModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Hizli Task</h3>
+            <button class="modal-close" onclick="closeModal('quickTaskModal')">&times;</button>
+        </div>
+        <form onsubmit="saveQuickTask(event)">
+            <div class="form-group">
+                <label>Baslik</label>
+                <input type="text" id="qt_title" class="form-input" required placeholder="Task basligi...">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>TCO Numarasi</label>
+                    <input type="text" id="qt_tco" class="form-input" placeholder="TCO-XXXX">
+                </div>
+                <div class="form-group">
+                    <label>Oncelik</label>
+                    <select id="qt_priority" class="form-input">
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="qt_category" class="form-input">
+                        <option value="backend">Backend</option>
+                        <option value="frontend">Frontend</option>
+                        <option value="devops">DevOps</option>
+                        <option value="hotfix">Hotfix</option>
+                        <option value="refactor">Refactor</option>
+                        <option value="analysis">Analysis</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>JIRA URL</label>
+                    <input type="url" id="qt_jira" class="form-input" placeholder="https://...">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </form>
+    </div>
+</div>
+
+<!-- Status Popup -->
+<div class="status-popup" id="statusPopup">
+    <div class="status-popup-content">
+        <button class="status-popup-btn sp-bekliyor" id="spBekliyor" onclick="setStatusFromPopup('bekliyor')">Bekliyor</button>
+        <button class="status-popup-btn sp-tamamlandi" id="spTamamlandi" onclick="setStatusFromPopup('tamamlandi')">Tamamlandi</button>
+    </div>
+</div>
+
+<script>
+// ─── Status Popup ───────────────────────────────────────
+let popupFdId = null;
+function openStatusPopup(e, id, currentStatus) {
+    e.stopPropagation();
+    popupFdId = id;
+    const popup = document.getElementById('statusPopup');
+    const rect = e.target.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 4) + 'px';
+    popup.style.left = rect.left + 'px';
+    popup.classList.add('open');
+    document.getElementById('spBekliyor').classList.toggle('sp-active', currentStatus === 'bekliyor');
+    document.getElementById('spTamamlandi').classList.toggle('sp-active', currentStatus === 'tamamlandi');
+}
+async function setStatusFromPopup(newStatus) {
+    if (!popupFdId) return;
+    document.getElementById('statusPopup').classList.remove('open');
+    await apiPut('/api/future-deployments/' + popupFdId, { status: newStatus });
+    showToast(newStatus === 'tamamlandi' ? 'Tamamlandi!' : 'Bekliyora alindi');
+    setTimeout(() => location.reload(), 400);
+}
+document.addEventListener('click', function(e) {
+    const popup = document.getElementById('statusPopup');
+    if (popup && !popup.contains(e.target) && !e.target.classList.contains('status-toggle')) {
+        popup.classList.remove('open');
+    }
+});
+
+// ─── Dashboard Charts ───────────────────────────────────
+function loadDashChart(range, btn) {
+    document.querySelectorAll('.card-wide .chart-range-tabs .tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    closeDashDetail();
+
+    fetch('/api/deployment-stats?range=' + range)
+        .then(r => r.json())
+        .then(d => {
+            renderDashBars(d.data);
+            renderDashDonut(d.summary);
+            renderDashRepos(d.repos);
+        });
+}
+
+function renderDashBars(data) {
+    const el = document.getElementById('dashChartBars');
+    const maxVal = Math.max(...data.map(d => d.total), 1);
+    let html = '<div class="mini-chart">';
+    data.forEach(d => {
+        const pct = Math.max((d.total / maxVal) * 100, 4);
+        const ids = (d.ids || []).join(',');
+        const click = d.total > 0 ? `onclick="toggleDashDetail('${ids}','${d.label}')"` : '';
+        const cls = d.total > 0 ? ' bar-clickable' : '';
+        html += `<div class="mini-chart-col${cls}" ${click}>
+            <div class="mini-chart-bar-wrap">
+                <div class="mini-chart-bar" style="height:${pct}%"></div>
+            </div>
+            <span class="mini-chart-count">${d.total}</span>
+            <span class="mini-chart-label">${d.label}</span>
+        </div>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function renderDashDonut(summary) {
+    const el = document.getElementById('dashChartDonut');
+    const total = summary.total || 1;
+    const bekPct = Math.round((summary.bekliyor / total) * 100);
+    const tamPct = 100 - bekPct;
+    el.innerHTML = `
+        <div class="donut-wrap">
+            <div class="donut" style="background: conic-gradient(var(--success) 0% ${tamPct}%, var(--warning) ${tamPct}% 100%)">
+                <div class="donut-hole"><span class="donut-total">${summary.total}</span></div>
+            </div>
+            <div class="donut-legend">
+                <div class="donut-leg-item"><span class="legend-dot legend-tamamlandi"></span>${summary.tamamlandi} Tamamlandi</div>
+                <div class="donut-leg-item"><span class="legend-dot legend-bekliyor"></span>${summary.bekliyor} Bekliyor</div>
+            </div>
+        </div>`;
+}
+
+function renderDashRepos(repos) {
+    const el = document.getElementById('dashChartRepos');
+    if (!repos || !repos.length) { el.innerHTML = '<p class="empty-state">Veri yok</p>'; return; }
+    const maxVal = repos[0].count || 1;
+    let html = '<div class="repo-stats">';
+    repos.slice(0, 5).forEach(r => {
+        const pct = Math.max((r.count / maxVal) * 100, 4);
+        html += `<a href="/repo-deployments?repo=${encodeURIComponent(r.name)}" class="repo-stat-row repo-stat-link">
+            <span class="repo-stat-name">${r.name.split('/').pop()}</span>
+            <div class="repo-stat-bar-wrap"><div class="repo-stat-bar" style="width:${pct}%"></div></div>
+            <span class="repo-stat-count">${r.count}</span>
+        </a>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function toggleDashDetail(idsStr, label) {
+    const el = document.getElementById('dashChartDetail');
+    if (el.dataset.activeIds === idsStr && el.classList.contains('open')) {
+        closeDashDetail();
+        return;
+    }
+    el.dataset.activeIds = idsStr;
+    el.innerHTML = '<p class="empty-state">Yukleniyor...</p>';
+    el.classList.add('open');
+
+    fetch('/api/future-deployments/by-ids?ids=' + idsStr)
+        .then(r => r.json())
+        .then(items => {
+            if (!items.length) { closeDashDetail(); return; }
+            let html = `<div class="chart-detail-header"><h4>${label} (${items.length})</h4><button class="btn-icon" onclick="closeDashDetail()">&times;</button></div>`;
+            html += '<div class="chart-detail-list">';
+            items.forEach(fd => {
+                const sCls = fd.status === 'tamamlandi' ? 'badge-fd-tamamlandi-sm' : 'badge-fd-bekliyor-sm';
+                const sTxt = fd.status === 'tamamlandi' ? 'OK' : 'Bekliyor';
+                html += `<a href="/deployment/${fd.id}" class="chart-detail-item">
+                    <span class="deploy-card-date">${fd.date}</span>
+                    <span class="badge ${sCls}">${sTxt}</span>
+                    <span class="badge badge-task">${fd.task}</span>
+                    <span class="chart-detail-title">${fd.title}</span>
+                </a>`;
+            });
+            html += '</div>';
+            el.innerHTML = html;
+        });
+}
+
+function closeDashDetail() {
+    const el = document.getElementById('dashChartDetail');
+    el.classList.remove('open');
+    el.dataset.activeIds = '';
+    setTimeout(() => { if (!el.classList.contains('open')) el.innerHTML = ''; }, 300);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashChart('week');
+    // Render inline smart tips on dashboard
+    fetch('/api/smart-insights').then(r => r.json()).then(items => {
+        const el = document.getElementById('dashSmartTips');
+        if (!items.length) return;
+        const icons = { critical: '!', warning: '!', info: 'i', success: '+', neutral: '~' };
+        const typeMap = { critical: 'warning', warning: 'warning', info: 'info', success: 'info', neutral: 'neutral' };
+        let html = '';
+        items.forEach(item => {
+            html += `<a href="${item.action || '#'}" class="smart-tip smart-tip-${typeMap[item.type] || 'neutral'}">
+                <span class="smart-tip-icon">${icons[item.type] || '?'}</span>
+                <span class="smart-tip-text"><strong>${item.title}</strong> — ${item.text}</span>
+            </a>`;
+        });
+        el.innerHTML = html;
+    });
+    loadDashboardEnhancements();
+});
+</script>
+{% endblock %}

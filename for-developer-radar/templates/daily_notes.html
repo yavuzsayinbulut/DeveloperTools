@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Daily Notes{% endblock %}
+{% block page_title %}Daily Notes{% endblock %}
+
+{% block content %}
+<div class="daily-layout">
+    <div class="daily-sidebar">
+        <h3 class="daily-sidebar-title">Notlar</h3>
+        <div class="daily-date-list">
+            <a href="/daily-notes?date={{ today.isoformat() }}" class="daily-date-item {% if selected_date == today.isoformat() %}active{% endif %}">
+                <span class="daily-date-label">Bugun</span>
+                <span class="daily-date-val">{{ today.strftime('%d %b') }}</span>
+            </a>
+            {% for note in notes %}
+            {% if note.date != today %}
+            <a href="/daily-notes?date={{ note.date.isoformat() }}" class="daily-date-item {% if selected_date == note.date.isoformat() %}active{% endif %}">
+                <span class="daily-date-val">{{ note.date.strftime('%d %b %Y') }}</span>
+                <span class="daily-date-preview">{{ note.content[:30] }}...</span>
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="daily-editor">
+        <div class="daily-editor-header">
+            <h3>{{ selected_date }}</h3>
+            <div class="daily-editor-actions">
+                <button class="btn btn-sm btn-ghost" id="previewBtn" onclick="togglePreview()">Onizleme</button>
+                <button class="btn btn-primary" onclick="saveDailyNote()">Kaydet</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Etiketler</label>
+            <input type="text" id="dn_tags" class="form-input" value="{{ current_note.tags if current_note else '' }}" placeholder="virgul ile ayir: review, deployment, bug">
+        </div>
+        <textarea id="dn_content" class="daily-textarea" placeholder="Bugunun notlarini yaz... (Markdown destekli)">{{ current_note.content if current_note else '' }}</textarea>
+        <div id="dn_preview" class="daily-preview-area" style="display:none;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const selectedDate = '{{ selected_date }}';
+
+function saveDailyNote() {
+    const content = document.getElementById('dn_content').value;
+    const tags = document.getElementById('dn_tags').value;
+    fetch('/api/daily-notes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: selectedDate, content, tags})
+    }).then(r => r.json()).then(() => {
+        showToast('Not kaydedildi');
+    });
+}
+
+function togglePreview() {
+    const ta = document.getElementById('dn_content');
+    const pv = document.getElementById('dn_preview');
+    if (pv.style.display === 'none') {
+        pv.innerHTML = simpleMarkdown(ta.value);
+        pv.style.display = 'block';
+        ta.style.display = 'none';
+    } else {
+        pv.style.display = 'none';
+        ta.style.display = 'block';
+    }
+}
+
+function simpleMarkdown(text) {
+    return text
+        .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/\n/g, '<br>');
+}
+
+// Auto-save with Ctrl+S
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveDailyNote();
+    }
+});
+</script>
+{% endblock %}

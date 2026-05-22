@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Search & Trace{% endblock %}
+{% block page_title %}Search & Trace{% endblock %}
+
+{% block content %}
+<div class="search-hero">
+    <form method="get" action="/search" class="search-hero-form">
+        <input type="text" name="q" value="{{ query }}" class="search-hero-input" placeholder="Keyword ile ara veya TCO-XXXX ile trace..." autofocus>
+        <select name="category" class="form-input search-cat-filter">
+            <option value="">Tum Kategoriler</option>
+            {% for key, label in category_labels.items() %}
+            <option value="{{ key }}" {% if category == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Ara</button>
+    </form>
+</div>
+
+{% if smart_summary %}
+<div class="search-smart-banner">{{ smart_summary }}</div>
+{% endif %}
+
+{% if smart_tokens %}
+<div class="search-smart-tokens">
+    {% for token in smart_tokens %}
+    <span class="search-smart-token">{{ token.label }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if search_suggestions %}
+<div class="search-suggestions">
+    {% for suggestion in search_suggestions %}
+    <a href="/search?q={{ suggestion | urlencode }}" class="search-suggestion-chip">{{ suggestion }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if is_trace and trace_results %}
+<div class="trace-layout">
+    <div class="trace-view">
+        <h2 class="trace-title">{{ trace_target or query }} - Timeline</h2>
+        <div class="trace-timeline">
+            {% for r in trace_results %}
+            <div class="trace-item">
+                <div class="trace-marker">
+                    <div class="trace-dot trace-dot-{{ r.doc_type|lower }}"></div>
+                    <div class="trace-line"></div>
+                </div>
+                <div class="trace-content">
+                    <div class="trace-item-header">
+                        <span class="badge badge-cat-{{ r.category }}">{{ category_labels.get(r.category, r.category) }}</span>
+                        <span class="trace-doc-type">{{ r.doc_type | replace('_', ' ') }}</span>
+                        {% if r.date %}
+                        <span class="trace-date">{{ r.date }}</span>
+                        {% endif %}
+                        <a href="/docs?path={{ r.rel_path }}" class="btn btn-ghost btn-sm" style="margin-left: auto;">Dosyada Ac</a>
+                    </div>
+                    <button class="trace-item-title trace-toggle" onclick="toggleTraceDetail(this)">
+                        {{ r.title }}
+                        <span class="trace-expand-icon">&#9660;</span>
+                    </button>
+                    <div class="trace-detail" style="display: none;">
+                        <pre class="trace-file-content">{{ r.content }}</pre>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <aside class="trace-intelligence-panel" id="tcoIntelligencePanel" data-tco="{{ trace_target or query }}">
+        <div class="trace-intelligence-loading">
+            <p class="empty-state">TCO intelligence yukleniyor...</p>
+        </div>
+    </aside>
+</div>
+
+{% elif not is_trace and results %}
+<div class="search-results">
+    <h3>{{ results|length }} sonuc bulundu</h3>
+    {% for r in results %}
+    <div class="search-result-card">
+        <div class="search-result-header">
+            <span class="badge" style="background:{{ category_colors.get(r.category, '#6b7280') }}">{{ category_labels.get(r.category, r.category) }}</span>
+            <a href="/docs?path={{ r.rel_path }}" class="search-result-title">{{ r.title }}</a>
+            <span class="search-result-path">{{ r.rel_path }}</span>
+        </div>
+        {% if r.tco_numbers %}
+        <div class="search-result-tcos">
+            {% for tco in r.tco_numbers.split(',') %}
+            {% if tco.strip() %}
+            <a href="/search?q={{ tco.strip() }}" class="tco-tag">{{ tco.strip() }}</a>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% for s in r.snippets %}
+        <pre class="search-snippet">{{ s }}</pre>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+
+{% elif query %}
+<div class="empty-state-large">
+    <p>"{{ query }}" icin sonuc bulunamadi.</p>
+</div>
+{% else %}
+<div class="search-tips">
+    <h3>Arama Ipuclari</h3>
+    <ul>
+        <li><code>TCO-4320</code> yazarak bir JIRA task'inin tum kayitlarini kronolojik sirayla gorebilirsin</li>
+        <li><code>repo:shire</code>, <code>type:decision</code> ve <code>tco:4176</code> gibi Smart Search 2.0 filtrelerini kullanabilirsin</li>
+        <li>Keyword ile tum .md dosyalarinda arama yapabilirsin</li>
+        <li>Kategori filtresi ile sonuclari daraltabilirsin</li>
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTraceDetail(btn) {
+    const detail = btn.nextElementSibling;
+    const icon = btn.querySelector('.trace-expand-icon');
+    if (detail.style.display === 'none') {
+        detail.style.display = 'block';
+        icon.innerHTML = '&#9650;';
+    } else {
+        detail.style.display = 'none';
+        icon.innerHTML = '&#9660;';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.trace-item').forEach((item, index) => {
+        setTimeout(() => item.classList.add('trace-live'), 60 * index);
+    });
+});
+</script>
+{% endblock %}

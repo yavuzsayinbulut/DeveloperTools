@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark"
+    data-anim-mode="{{ anim_config.mode }}"
+    data-anim-page="{{ request.path }}"
+    data-anim-idle-pulse="{{ '1' if anim_config.idle_pulse else '0' }}"
+    {% if request.path in anim_config.pages_off %}data-anim-page-off="1"{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} - Delivery Radar</title>
+    {% if ui_effects_enabled %}
+    <link rel="stylesheet" href="{{ url_for('ui_effects.static', filename='css/animations.css') }}">
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+    window.YS_ANIM = {{ anim_config | tojson }};
+    window.YS_PATH = {{ request.path | tojson }};
+    window.YS_ANIM.pageOff = (window.YS_ANIM.pages_off || []).indexOf(window.YS_PATH) !== -1;
+    </script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Splash Screen -->
+    {% if anim_config.splash and request.path not in anim_config.pages_off %}
+    <div class="splash" id="splash">
+        <canvas class="splash-matrix" id="splashMatrix"></canvas>
+        <div class="splash-scanlines"></div>
+        <div class="splash-inner">
+            <div class="splash-phase splash-phase-1" id="splashPhase1">
+                <div class="splash-hex-ring" id="hexRing">
+                    <div class="splash-logo-big">DR</div>
+                </div>
+                <div class="splash-typing" id="splashTyping"></div>
+            </div>
+            <div class="splash-phase splash-phase-2" id="splashPhase2" style="display:none;">
+                <div class="splash-terminal">
+                    <div class="splash-lines" id="splashLines"></div>
+                    <span class="splash-cursor">_</span>
+                </div>
+            </div>
+            <div class="splash-phase splash-phase-3" id="splashPhase3" style="display:none;">
+                <div class="splash-brand">
+                    <div class="splash-brand-line">made by</div>
+                    <div class="splash-brand-name" id="brandName">feanor</div>
+                    <div class="splash-brand-sub" id="brandSub">// yavuz</div>
+                </div>
+            </div>
+            <div class="splash-phase splash-phase-4" id="splashPhase4" style="display:none;">
+                <div class="splash-welcome">
+                    <div class="splash-welcome-line">Welcome back,</div>
+                    <div class="splash-welcome-name" id="welcomeName">Yavuz</div>
+                </div>
+            </div>
+        </div>
+        <div class="splash-progress" id="splashProgress"><div class="splash-progress-bar" id="splashProgressBar"></div></div>
+    </div>
+    {% endif %}
+
+    <!-- Page Transition Overlay -->
+    {% if anim_config.transitions %}
+    <div class="transition-overlay" id="transitionOverlay">
+        <canvas id="matrixCanvas"></canvas>
+        <div class="transition-glitch-flash"></div>
+        <div class="transition-scanline"></div>
+        <div class="transition-center">
+            <div class="transition-text" id="transitionText"></div>
+            <div class="transition-signature" id="transitionSig"></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">DR</div>
+            <div class="logo-text">Delivery Radar</div>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">
+                <span class="nav-icon">&#9632;</span> Dashboard
+            </a></li>
+            <li><a href="/upcoming-deployments" class="{% if request.path == '/upcoming-deployments' %}active{% endif %}">
+                <span class="nav-icon">&#9652;</span> Gelecek Deploy
+            </a></li>
+            <li><a href="/deployments" class="{% if request.path == '/deployments' %}active{% endif %}">
+                <span class="nav-icon">&#9650;</span> Deployments
+            </a></li>
+            <li><a href="/repo-deployments" class="{% if request.path == '/repo-deployments' %}active{% endif %}">
+                <span class="nav-icon">&#9670;</span> Repo Stats
+            </a></li>
+            <li><a href="/team-pulse" class="{% if request.path == '/team-pulse' %}active{% endif %}">
+                <span class="nav-icon">&#9889;</span> Team Pulse
+            </a></li>
+            <li><a href="/delivery-radar" class="{% if request.path == '/delivery-radar' %}active{% endif %}">
+                <span class="nav-icon">&#9673;</span> Delivery Radar
+            </a></li>
+            <li><a href="/tasks" class="{% if request.path == '/tasks' %}active{% endif %}">
+                <span class="nav-icon">&#9654;</span> Tasks Board
+            </a></li>
+            <li><a href="/reminders" class="{% if request.path == '/reminders' %}active{% endif %}">
+                <span class="nav-icon">&#9733;</span> Reminders
+            </a></li>
+            <li><a href="/daily-notes" class="{% if request.path.startswith('/daily') %}active{% endif %}">
+                <span class="nav-icon">&#9998;</span> Daily Notes
+            </a></li>
+            <li><a href="/search" class="{% if request.path == '/search' %}active{% endif %}">
+                <span class="nav-icon">&#8981;</span> Search & Trace
+            </a></li>
+            <li><a href="/docs" class="{% if request.path == '/docs' and 'fordeveloper' not in request.args.get('path', '') %}active{% endif %}">
+                <span class="nav-icon">&#9776;</span> Docs
+            </a></li>
+            <li class="nav-divider"></li>
+            <li><a href="/about" class="{% if request.path == '/about' %}active{% endif %}">
+                <span class="nav-icon">&#9432;</span> Hakkinda
+            </a></li>
+            <li><a href="/settings" class="{% if request.path == '/settings' %}active{% endif %}">
+                <span class="nav-icon">&#9881;</span> Settings
+            </a></li>
+            <li><a href="/logout" class="nav-logout">
+                <span class="nav-icon">&#10140;</span> Cikis
+            </a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <small>Port 5556 &middot; Encrypted</small>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+            </div>
+            <div class="topbar-right">
+                <form action="/search" method="get" class="search-form">
+                    <input type="text" name="q" placeholder="Ara... (TCO-XXXX ile trace)" value="{{ request.args.get('q', '') }}" class="search-input">
+                </form>
+                <div class="notif-bell-wrap">
+                    <button class="notif-bell" id="notifBell" onclick="toggleNotifPanel()">
+                        <span class="notif-bell-icon">&#9888;</span>
+                        <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+                    </button>
+                    <div class="notif-panel" id="notifPanel">
+                        <div class="notif-panel-header">
+                            <h4>Bildirimler</h4>
+                            <button class="btn-icon" onclick="toggleNotifPanel()">&times;</button>
+                        </div>
+                        <div class="notif-panel-body" id="notifPanelBody">
+                            <p class="empty-state">Yukleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+                <span class="clock" id="clock"></span>
+            </div>
+        </header>
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <div class="git-pulse-fab" id="gitPulseFab">
+        <button type="button" class="git-pulse-fab-btn" id="gitPulseFabBtn" title="Git Pulse">
+            <span class="git-pulse-fab-icon">&#9889;</span>
+            <span class="git-pulse-fab-text">Git Pulse</span>
+        </button>
+    </div>
+
+    <aside class="git-pulse-drawer" id="gitPulseDrawer" aria-hidden="true">
+        <div class="git-pulse-drawer-header">
+            <div>
+                <div class="git-pulse-drawer-eyebrow">Live Git View</div>
+                <h3>Git Pulse</h3>
+            </div>
+            <div class="git-pulse-drawer-actions">
+                <a href="/team-pulse" class="btn btn-ghost btn-sm">Team Pulse</a>
+                <button type="button" class="btn-icon" id="gitPulseCloseBtn">&times;</button>
+            </div>
+        </div>
+        <div class="git-pulse-drawer-body" id="gitPulseDrawerBody">
+            <p class="empty-state">Yukleniyor...</p>
+        </div>
+    </aside>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+    (function() {
+        const splash = document.getElementById('splash');
+        if (!splash) return;
+        if (!window.YS_ANIM || !window.YS_ANIM.splash || window.YS_ANIM.pageOff) {
+            splash.remove();
+            return;
+        }
+        const KEY = 'ys_splash_shown';
+        const intervalMin = Number(window.YS_ANIM.splash_interval_min) || 30;
+        const INTERVAL_MS = intervalMin * 60 * 1000;
+        const last = parseInt(sessionStorage.getItem(KEY) || '0', 10);
+        const now = Date.now();
+
+        if (INTERVAL_MS > 0 && last && (now - last) < INTERVAL_MS) {
+            splash.remove();
+            return;
+        }
+
+        const progressBar = document.getElementById('splashProgressBar');
+        let bootData = null;
+        fetch('/api/boot-status').then(r => r.json()).then(d => { bootData = d; });
+
+        // ─── Matrix background
+        const mc = document.getElementById('splashMatrix');
+        const mctx = mc.getContext('2d');
+        mc.width = window.innerWidth;
+        mc.height = window.innerHeight;
+        const mFontSize = 12;
+        const mCols = Math.floor(mc.width / mFontSize);
+        const mDrops = Array(mCols).fill(1);
+        const mChars = 'アウエカキクケサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF<>{}[];=/\\';
+
+        function drawMatrix() {
+            mctx.fillStyle = 'rgba(10, 12, 16, 0.08)';
+            mctx.fillRect(0, 0, mc.width, mc.height);
+            mctx.font = mFontSize + 'px monospace';
+            for (let i = 0; i < mDrops.length; i++) {
+                const ch = mChars[Math.floor(Math.random() * mChars.length)];
+                mctx.fillStyle = Math.random() > 0.97 ? '#fff' : 'rgba(0, 255, 65, ' + (0.15 + Math.random() * 0.2) + ')';
+                mctx.fillText(ch, i * mFontSize, mDrops[i] * mFontSize);
+                if (mDrops[i] * mFontSize > mc.height && Math.random() > 0.98) mDrops[i] = 0;
+                mDrops[i]++;
+            }
+            if (splash.parentElement) requestAnimationFrame(drawMatrix);
+        }
+        drawMatrix();
+
+        // ─── Progress bar
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 1.5;
+            if (progress > 100) progress = 100;
+            progressBar.style.width = progress + '%';
+        }, 80);
+
+        // ─── Phase 1: Logo + typing text (0-2s)
+        const typingEl = document.getElementById('splashTyping');
+        const typeTexts = ['INITIALIZING SYSTEM ...', 'DECRYPTING KERNEL ...', 'LOADING DEPLOYMENT TRACKING ...'];
+        const typeText = typeTexts[Math.floor(Math.random() * typeTexts.length)];
+        let ti = 0;
+        const typeTimer = setInterval(() => {
+            if (ti < typeText.length) {
+                typingEl.textContent = typeText.slice(0, ti + 1) + '_';
+                ti++;
+            } else {
+                typingEl.textContent = typeText;
+                clearInterval(typeTimer);
+            }
+        }, 50);
+
+        // Hex ring rotation
+        const hexRing = document.getElementById('hexRing');
+        hexRing.classList.add('spin');
+
+        // ─── Phase 2: Terminal boot (2s-4.5s)
+        setTimeout(() => {
+            document.getElementById('splashPhase1').style.display = 'none';
+            document.getElementById('splashPhase2').style.display = 'flex';
+
+            const linesEl = document.getElementById('splashLines');
+            const steps = [
+                { text: '> scanning workspace ...', delay: 0 },
+                { text: '> parsing DEPLOYMENT_LOG.md ...', delay: 250 },
+                { text: '> syncing deployments ...', delay: 500 },
+                { text: null, delay: 700 },
+                { text: '> rebuilding md index ...', delay: 900 },
+                { text: '> connecting to sqlite ...', delay: 1100 },
+                { text: '> verifying integrity [sha256] ...', delay: 1300 },
+                { text: '> loading scheduler ...', delay: 1500 },
+                { text: '> mounting encrypted volume ...', delay: 1700 },
+                { text: null, delay: 1900 },
+                { text: '> system ready. welcome, yavuz.', delay: 2100 },
+            ];
+
+            steps.forEach(step => {
+                setTimeout(() => {
+                    if (step.text === null && bootData) {
+                        const d = bootData;
+                        addLine(`  [OK] ${d.indexed_files} files | ${d.deployments} deploys | ${d.tasks} tasks`, 'splash-data');
+                    } else if (step.text) {
+                        addLine(step.text, '');
+                    }
+                }, step.delay);
+            });
+
+            function addLine(text, cls) {
+                const line = document.createElement('div');
+                line.className = 'splash-line' + (cls ? ' ' + cls : '');
+                line.textContent = text;
+                linesEl.appendChild(line);
+                linesEl.scrollTop = linesEl.scrollHeight;
+            }
+        }, 2000);
+
+        // ─── Phase 3: "made by feanor // yavuz" (4.5s-5.8s)
+        setTimeout(() => {
+            document.getElementById('splashPhase2').style.display = 'none';
+            document.getElementById('splashPhase3').style.display = 'flex';
+
+            // Glitch-decode effect on brand name
+            const brandEl = document.getElementById('brandName');
+            const brandSubEl = document.getElementById('brandSub');
+            const glitchChars = '!@#$%^&*<>[]{}|/\\';
+            let gi = 0;
+            const target = 'feanor';
+            const glitchTimer = setInterval(() => {
+                let out = '';
+                for (let j = 0; j < target.length; j++) {
+                    out += j <= gi ? target[j] : glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                }
+                brandEl.textContent = out;
+                gi++;
+                if (gi >= target.length) { brandEl.textContent = target; clearInterval(glitchTimer); }
+            }, 60);
+
+            // "// yavuz" decode with slight delay
+            brandSubEl.textContent = '';
+            const subTarget = '// yavuz';
+            let si = 0;
+            setTimeout(() => {
+                const subTimer = setInterval(() => {
+                    let sout = '';
+                    for (let k = 0; k < subTarget.length; k++) {
+                        sout += k <= si ? subTarget[k] : glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                    }
+                    brandSubEl.textContent = sout;
+                    si++;
+                    if (si >= subTarget.length) { brandSubEl.textContent = subTarget; clearInterval(subTimer); }
+                }, 50);
+            }, 300);
+        }, 4500);
+
+        // ─── Phase 4: "Welcome back, Yavuz" (6s-7.2s)
+        setTimeout(() => {
+            document.getElementById('splashPhase3').style.display = 'none';
+            document.getElementById('splashPhase4').style.display = 'flex';
+        }, 6200);
+
+        // ─── Fade out (7.5s)
+        setTimeout(() => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            splash.classList.add('splash-fade');
+            sessionStorage.setItem(KEY, String(Date.now()));
+            setTimeout(() => splash.remove(), 700);
+        }, 7500);
+    })();
+    </script>
+    <script>
+    // ─── Hacker Page Transition ─────────────────────────────
+    (function() {
+        if (!window.YS_ANIM || !window.YS_ANIM.transitions) return;
+        const CHANCE = (Number(window.YS_ANIM.transition_chance) || 0) / 100;
+        if (CHANCE <= 0) return;
+        const PAGES_OFF = window.YS_ANIM.pages_off || [];
+        const overlay = document.getElementById('transitionOverlay');
+        if (!overlay) return;
+        const canvas = document.getElementById('matrixCanvas');
+        const textEl = document.getElementById('transitionText');
+        const sigEl  = document.getElementById('transitionSig');
+        const ctx = canvas.getContext('2d');
+        let animId = null;
+
+        const hackerLines = [
+            'ACCESS GRANTED',
+            'DECRYPTING PAYLOAD ...',
+            'LOADING MODULE ...',
+            'SWITCHING CONTEXT ...',
+            'INITIALIZING VIEW ...',
+            'PARSING BUFFER ...',
+            'ROUTING PACKETS ...',
+            'COMPILING FRAGMENT ...',
+            'CONNECTING TO NODE ...',
+            'RESOLVING PATH ...',
+            'EXECUTING BINARY ...',
+            'KERNEL OVERRIDE ...',
+            'INJECTING SHELLCODE ...',
+            'BYPASSING FIREWALL ...',
+            'FORKING PROCESS ...',
+            'ALLOCATING MEMORY ...',
+            'SYNCING NODES ...',
+            'MOUNTING FILESYSTEM ...',
+            'SPAWNING DAEMON ...',
+            'ENCRYPTING CHANNEL ...',
+            'ELEVATING PRIVILEGES ...',
+            'PATCHING BINARY ...',
+            'INTERCEPTING SYSCALL ...',
+            'REWRITING JUMP TABLE ...',
+        ];
+
+        const signatures = [
+            'made by feanor // yavuz',
+            'feanor x yavuz',
+            '[ feanor ] :: yavuz',
+            'crafted by feanor & yavuz',
+        ];
+
+        // Intercept sidebar nav clicks
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (!href || href === '#' || href === window.location.pathname) return;
+                if (PAGES_OFF.indexOf(href) !== -1) return;
+                if (Math.random() > CHANCE) return;
+
+                e.preventDefault();
+                runTransition(href);
+            });
+        });
+
+        function runTransition(targetUrl) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            overlay.classList.add('active');
+            sigEl.classList.remove('visible');
+            sigEl.textContent = '';
+
+            // Matrix rain — enhanced with color variety & variable speed
+            const fontSize = 14;
+            const cols = Math.floor(canvas.width / fontSize);
+            const drops = Array(cols).fill(1);
+            const speeds = Array.from({length: cols}, () => 0.6 + Math.random() * 0.8);
+            const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF<>{}[];=$/\\';
+
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(10, 12, 16, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = fontSize + 'px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const ch = chars[Math.floor(Math.random() * chars.length)];
+                    const r = Math.random();
+                    if (r > 0.97) {
+                        ctx.fillStyle = '#ffffff';
+                    } else if (r > 0.93) {
+                        ctx.fillStyle = '#00d4ff';
+                    } else {
+                        ctx.fillStyle = 'rgba(0, 255, 65, ' + (0.25 + Math.random() * 0.35) + ')';
+                    }
+                    ctx.fillText(ch, i * fontSize, drops[i] * fontSize);
+
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i] += speeds[i];
+                }
+                animId = requestAnimationFrame(drawMatrix);
+            }
+
+            ctx.fillStyle = '#0a0c10';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawMatrix();
+
+            // Glitch-typing: each char briefly shows a random glyph before settling
+            const line1 = hackerLines[Math.floor(Math.random() * hackerLines.length)];
+            const glitchChars = '!@#$%^&*<>[]{}|/\\~';
+            textEl.textContent = '';
+            let charIdx = 0;
+
+            const typeInterval = setInterval(() => {
+                if (charIdx < line1.length) {
+                    // show glitch char first
+                    const done = line1.slice(0, charIdx);
+                    const glitch = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                    textEl.textContent = done + glitch + '_';
+                    // then settle to real char
+                    const ci = charIdx;
+                    setTimeout(() => {
+                        if (ci === charIdx - 1) {
+                            textEl.textContent = line1.slice(0, ci + 1) + '_';
+                        }
+                    }, 22);
+                    charIdx++;
+                } else {
+                    textEl.textContent = line1;
+                    clearInterval(typeInterval);
+                }
+            }, 38);
+
+            // Signature fade-in after text is mostly typed
+            setTimeout(() => {
+                const sig = signatures[Math.floor(Math.random() * signatures.length)];
+                sigEl.textContent = sig;
+                sigEl.classList.add('visible');
+            }, 700);
+
+            // Navigate after animation
+            setTimeout(() => {
+                cancelAnimationFrame(animId);
+                clearInterval(typeInterval);
+                window.location.href = targetUrl;
+            }, 1400);
+        }
+    })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

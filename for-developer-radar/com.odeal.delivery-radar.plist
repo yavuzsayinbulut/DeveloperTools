@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.odeal.delivery-radar</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/yavuz.sayinbulut/Desktop/Tools/for-developer-radar/venv/bin/python</string>
+        <string>/Users/yavuz.sayinbulut/Desktop/Tools/for-developer-radar/app.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yavuz.sayinbulut/Desktop/Tools/for-developer-radar</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/yavuz.sayinbulut/Desktop/Tools/for-developer-radar/data/app.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yavuz.sayinbulut/Desktop/Tools/for-developer-radar/data/error.log</string>
+</dict>
+</plist>

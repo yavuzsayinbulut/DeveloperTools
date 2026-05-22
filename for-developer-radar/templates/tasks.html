@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Tasks Board{% endblock %}
+{% block page_title %}Tasks Board{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <button class="btn btn-primary" onclick="openTaskModal()">+ Yeni Task</button>
+</div>
+
+<div class="kanban">
+    {% for status in statuses %}
+    <div class="kanban-column" data-status="{{ status }}">
+        <div class="kanban-header">
+            <span class="kanban-title">{{ status | replace('_', ' ') }}</span>
+            <span class="kanban-count">{{ columns[status]|length }}</span>
+        </div>
+        <div class="kanban-cards" data-status="{{ status }}">
+            {% for task in columns[status] %}
+            <div class="kanban-card" data-id="{{ task.id }}" draggable="true">
+                <div class="kanban-card-top">
+                    <span class="badge badge-cat-{{ task.category }}">{{ task.category }}</span>
+                    <span class="priority-dot priority-{{ task.priority }}" title="{{ task.priority }}"></span>
+                </div>
+                {% if task.tco_number %}
+                <div class="kanban-card-tco">
+                    <a href="/search?q={{ task.tco_number }}" class="tco-link">{{ task.tco_number }}</a>
+                </div>
+                {% endif %}
+                <div class="kanban-card-title">{{ task.title }}</div>
+                {% if task.description %}
+                <div class="kanban-card-desc">{{ task.description[:80] }}</div>
+                {% endif %}
+                <div class="kanban-card-links">
+                    {% if task.jira_url %}
+                    <a href="{{ task.jira_url }}" target="_blank" class="card-ext-link">JIRA</a>
+                    {% endif %}
+                    {% if task.mr_url %}
+                    <a href="{{ task.mr_url }}" target="_blank" class="card-ext-link">MR</a>
+                    {% endif %}
+                </div>
+                <div class="kanban-card-footer">
+                    <span class="card-date">{{ task.updated_at.strftime('%d/%m') if task.updated_at else '' }}</span>
+                    <div class="card-actions">
+                        <button class="btn-icon" onclick="editTask({{ task.id }}, {{ task.to_dict()|tojson|e }})" title="Duzenle">&#9998;</button>
+                        <button class="btn-icon btn-danger" onclick="deleteTask({{ task.id }})" title="Sil">&times;</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Task Modal -->
+<div class="modal" id="taskModal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="taskModalTitle">Yeni Task</h3>
+            <button class="modal-close" onclick="closeModal('taskModal')">&times;</button>
+        </div>
+        <form onsubmit="saveTask(event)">
+            <input type="hidden" id="tm_id" value="">
+            <div class="form-group">
+                <label>Baslik</label>
+                <input type="text" id="tm_title" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label>Aciklama</label>
+                <textarea id="tm_description" class="form-input" rows="3"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>TCO Numarasi</label>
+                    <input type="text" id="tm_tco_number" class="form-input" placeholder="TCO-XXXX">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="tm_status" class="form-input">
+                        <option value="TODO">TODO</option>
+                        <option value="IN_PROGRESS">IN PROGRESS</option>
+                        <option value="IN_REVIEW">IN REVIEW</option>
+                        <option value="DONE">DONE</option>
+                        <option value="ARCHIVED">ARCHIVED</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Oncelik</label>
+                    <select id="tm_priority" class="form-input">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="tm_category" class="form-input">
+                        <option value="backend">Backend</option>
+                        <option value="frontend">Frontend</option>
+                        <option value="devops">DevOps</option>
+                        <option value="hotfix">Hotfix</option>
+                        <option value="refactor">Refactor</option>
+                        <option value="analysis">Analysis</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>JIRA URL</label>
+                    <input type="url" id="tm_jira_url" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>MR URL</label>
+                    <input type="url" id="tm_mr_url" class="form-input">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Deployment Tarihi</label>
+                <input type="date" id="tm_deployment_date" class="form-input">
+            </div>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/kanban.js') }}"></script>
+{% endblock %}

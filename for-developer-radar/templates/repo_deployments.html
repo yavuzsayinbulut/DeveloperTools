@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Repo Istatistikleri{% endblock %}
+{% block page_title %}Repo Istatistikleri{% if repo_name %} - {{ repo_name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <div class="month-pills">
+        <a href="/repo-deployments" class="tab {% if not repo_name %}active{% endif %}">Tumu ({{ deployments|length if not repo_name else '' }})</a>
+        {% for name, count in repo_list %}
+        <a href="/repo-deployments?repo={{ name|urlencode }}" class="tab {% if repo_name == name %}active{% endif %}">{{ name.split('/')[-1] }} ({{ count }})</a>
+        {% endfor %}
+    </div>
+</div>
+
+{% if repo_name %}
+<div class="card" style="margin-bottom: 16px;">
+    <h3 style="margin-bottom: 8px;">{{ repo_name }}</h3>
+    <div class="detail-meta" style="border:none; padding:0; margin:0;">
+        <span>Toplam: {{ deployments|length }} deployment</span>
+        <span>Bekliyor: {{ deployments|selectattr('status', 'equalto', 'bekliyor')|list|length }}</span>
+        <span>Tamamlandi: {{ deployments|selectattr('status', 'equalto', 'tamamlandi')|list|length }}</span>
+    </div>
+</div>
+{% endif %}
+
+<div class="deploy-cards">
+    {% for fd in deployments %}
+    <div class="card deploy-card">
+        <div class="deploy-card-header">
+            <div class="deploy-card-top-row">
+                <span class="deploy-card-date">{{ fd.date }}</span>
+                <span class="badge badge-fd-{{ fd.status }}">{{ 'Bekliyor' if fd.status == 'bekliyor' else 'Tamamlandi' }}</span>
+                {% if fd.task %}
+                <span class="badge badge-task clickable-copy" data-copy="{{ fd.task }}" title="Tikla: kopyala">{{ fd.task }}</span>
+                {% endif %}
+            </div>
+            <h3 class="deploy-card-title"><a href="/deployment/{{ fd.id }}">{{ fd.title }}</a></h3>
+        </div>
+
+        {% if fd.summary %}
+        <p class="deploy-summary">{{ fd.summary }}</p>
+        {% endif %}
+
+        {% if fd.repos %}
+        <div class="deploy-repos">
+            {% for repo in fd.repos %}
+            {% if not repo_name or repo.name == repo_name %}
+            <div class="repo-block">
+                <div class="repo-name">{{ repo.name }}</div>
+                <div class="repo-details">
+                    {% if repo.mr_url %}
+                    <a href="{{ repo.mr_url }}" target="_blank" class="deploy-link mr-link">MR &nearr;</a>
+                    {% endif %}
+                    {% if repo.branch and repo.branch != 'Bilinmiyor' %}
+                    <span class="repo-meta">Branch: <code>{{ repo.branch }}</code></span>
+                    {% endif %}
+                    {% if repo.test_merge %}
+                    <span class="badge badge-merge-{{ repo.test_merge|lower|replace(' ', '-')|replace('i', 'i') }}">
+                        Test: {{ repo.test_merge }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="deploy-card-actions">
+            <button class="btn btn-ghost btn-sm" onclick="copyFdMarkdown({{ fd.id }})">Kopyala</button>
+            {% if fd.task %}
+            <a href="/search?q={{ fd.task }}" class="btn btn-ghost btn-sm">Trace &rarr;</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not deployments %}
+<div class="empty-state-large">
+    <p>Bu repo icin deployment kaydi yok.</p>
+</div>
+{% endif %}
+{% endblock %}

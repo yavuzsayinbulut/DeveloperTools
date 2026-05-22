@@ -19,6 +19,7 @@ lokalde tutulur.
 |------|-----|--------------|
 | [tools-hub](#tools-hub) | PySide6 desktop | Bu repodaki araclari tek pencereden baslat, durdur, URL ac, log incele, PID/port kill yap |
 | [display-agent](#display-agent) | Swift menubar | Menubar'da sessiz calisan display session ve input activity yardimcisi |
+| [for-developer-radar](#for-developer-radar) | Flask dashboard | Finance workspace icin Git, Jira/TCO ve deployment notlarini eslestiren delivery radar |
 | [window-pinner-menubar](#window-pinner-menubar) | Swift menubar | Aktif macOS penceresini hotkey ile hep ustte tut, sonra normal gibi tasi ve yeniden boyutlandir |
 
 ```
@@ -27,6 +28,7 @@ Tools/
 ├── stop.command
 ├── tools-hub/               # arac yoneticisi
 ├── display-agent/           # display session yardimcisi
+├── for-developer-radar/     # Finance delivery radar dashboard
 ├── window-pinner-menubar/   # aktif pencereyi ustte tutan macOS yardimci araci
 ├── clipboard-keeper/        # menubar clipboard manager
 └── fordeveloper/            # workspace dashboard (Flask)
@@ -92,6 +94,22 @@ Menubar'da calisan, Dock'ta gorunmeyen kucuk bir display session yardimcisi.
 cd display-agent
 ./start.command
 ```
+
+---
+
+## for-developer-radar
+
+Finance workspace icindeki local git gecmisi, deployment notlari ve Jira/TCO
+izlerini tek ekranda eslestiren Flask dashboard.
+
+**Calistirma:**
+
+```bash
+cd for-developer-radar
+./fdev start
+```
+
+Tarayici: `http://127.0.0.1:5556`
 
 ---
 

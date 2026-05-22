@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Son Deploymentlar{% endblock %}
+{% block page_title %}Son Deploymentlar{% endblock %}
+
+{% block content %}
+{% if is_deploy_today %}
+<div class="alert alert-warning">Bugun Deployment Gunu!</div>
+{% endif %}
+
+<!-- Chart Section -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Deployment Grafigi</h3>
+        <div class="chart-range-tabs">
+            <button class="tab active" onclick="loadChart('week', this)">Hafta</button>
+            <button class="tab" onclick="loadChart('month', this)">Ay</button>
+            <button class="tab" onclick="loadChart('3month', this)">3 Ay</button>
+            <button class="tab" onclick="loadChart('year', this)">Yil</button>
+        </div>
+    </div>
+    <div class="chart-summary" id="chartSummary"></div>
+    <div class="chart-container" id="chartContainer">
+        <p class="empty-state">Yukleniyor...</p>
+    </div>
+    <div class="chart-repos" id="chartRepos"></div>
+    <div class="chart-detail" id="chartDetail"></div>
+</div>
+
+<!-- Filters -->
+<div class="toolbar">
+    <form method="get" class="filter-form">
+        <input type="date" name="date" value="{{ filter_date }}" class="form-input" onchange="this.form.submit()">
+        {% if filter_date or filter_month %}
+        <a href="/deployments" class="btn btn-sm btn-ghost">Temizle</a>
+        {% endif %}
+    </form>
+    {% if month_groups %}
+    <div class="month-pills">
+        {% for ym, count in month_groups[:6] %}
+        <a href="/deployments?month={{ ym }}" class="tab {% if filter_month == ym %}active{% endif %}">{{ ym }} ({{ count }})</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <span class="toolbar-info">{{ completed_deployments|length }} kayit</span>
+</div>
+
+<div class="deploy-cards">
+    {% for fd in completed_deployments %}
+    <div class="card deploy-card">
+        <div class="deploy-card-header">
+            <div class="deploy-card-top-row">
+                <span class="deploy-card-date">{{ fd.date }}</span>
+                <span class="badge badge-fd-tamamlandi">Tamamlandi</span>
+                {% if fd.task %}
+                <span class="badge badge-task clickable-copy" data-copy="{{ fd.task }}" title="Tikla: kopyala">{{ fd.task }}</span>
+                {% endif %}
+            </div>
+            <h3 class="deploy-card-title"><a href="/deployment/{{ fd.id }}">{{ fd.title }}</a></h3>
+        </div>
+
+        {% if fd.jira_url %}
+        <a href="{{ fd.jira_url }}" target="_blank" class="deploy-link jira-link">JIRA &nearr;</a>
+        {% endif %}
+
+        {% if fd.summary %}
+        <p class="deploy-summary">{{ fd.summary }}</p>
+        {% endif %}
+
+        {% if fd.repos %}
+        <div class="deploy-repos">
+            {% for repo in fd.repos %}
+            <div class="repo-block">
+                <div class="repo-name">{{ repo.name }}</div>
+                <div class="repo-details">
+                    {% if repo.mr_url %}
+                    <a href="{{ repo.mr_url }}" target="_blank" class="deploy-link mr-link">MR &nearr;</a>
+                    {% endif %}
+                    {% if repo.branch and repo.branch != 'Bilinmiyor' %}
+                    <span class="repo-meta">Branch: <code>{{ repo.branch }}</code></span>
+                    {% endif %}
+                    {% if repo.commit and repo.commit != 'Bilinmiyor' %}
+                    <span class="repo-meta">Commit: <code>{{ repo.commit }}</code></span>
+                    {% endif %}
+                    {% if repo.test_merge %}
+                    <span class="badge badge-merge-{{ repo.test_merge|lower|replace(' ', '-')|replace('i', 'i') }}">
+                        Test: {{ repo.test_merge }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if repo.detail %}
+                <p class="repo-detail">{{ repo.detail }}</p>
+                {% endif %}
+                {% if repo.test_note %}
+                <p class="repo-test-note"><em>{{ repo.test_note }}</em></p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if fd.contacts %}
+        <div class="deploy-contacts">
+            {% for c in fd.contacts.split(',') if c.strip() %}
+            <span class="badge badge-contact">{{ c.strip() }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="deploy-card-actions">
+            <button class="btn btn-ghost btn-sm" onclick="copyFdMarkdown({{ fd.id }})">Tamamini Kopyala</button>
+            <button class="btn btn-ghost btn-sm" onclick="revertFd({{ fd.id }})">Bekliyora Geri Al</button>
+        </div>
+
+        {% if fd.task %}
+        <a href="/search?q={{ fd.task }}" class="trace-link">Bu task'in tum kayitlarini gor &rarr;</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% if not completed_deployments %}
+<div class="empty-state-large">
+    <p>Tamamlanan deployment kaydi yok.</p>
+    <a href="/upcoming-deployments" class="btn btn-primary" style="margin-top: 12px;">Gelecek Deploymentlara Git</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadChart(range, btn) {
+    document.querySelectorAll('.chart-range-tabs .tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    document.getElementById('chartDetail').innerHTML = '';
+
+    fetch('/api/deployment-stats?range=' + range)
+        .then(r => r.json())
+        .then(d => {
+            renderChart(d.data);
+            renderSummary(d.summary);
+            renderRepos(d.repos);
+        });
+}
+
+function renderChart(data) {
+    const container = document.getElementById('chartContainer');
+    const maxVal = Math.max(...data.map(d => d.total), 1);
+    let html = '<div class="bar-chart">';
+    data.forEach((d, i) => {
+        const pct = Math.max((d.total / maxVal) * 100, 3);
+        const bekPct = d.total > 0 ? (d.bekliyor / d.total) * pct : 0;
+        const tamPct = pct - bekPct;
+        const ids = (d.ids || []).join(',');
+        const clickable = d.total > 0 ? `onclick="showBarDetail('${ids}', '${d.label}')"` : '';
+        const cls = d.total > 0 ? ' bar-clickable' : '';
+        html += `<div class="bar-chart-col${cls}" ${clickable}>
+            <div class="bar-chart-bar-wrap">
+                <div class="bar-chart-bar bar-tamamlandi" style="height:${tamPct}%"></div>
+                <div class="bar-chart-bar bar-bekliyor" style="height:${bekPct}%"></div>
+            </div>
+            <span class="bar-chart-count">${d.total}</span>
+            <span class="bar-chart-label">${d.label}</span>
+        </div>`;
+    });
+    html += '</div>';
+    html += '<div class="chart-legend"><span class="legend-item"><span class="legend-dot legend-tamamlandi"></span>Tamamlandi</span><span class="legend-item"><span class="legend-dot legend-bekliyor"></span>Bekliyor</span></div>';
+    container.innerHTML = html;
+}
+
+function renderSummary(summary) {
+    document.getElementById('chartSummary').innerHTML = `
+        <div class="chart-stat"><span class="chart-stat-val">${summary.total}</span><span class="chart-stat-lbl">Toplam</span></div>
+        <div class="chart-stat"><span class="chart-stat-val chart-val-ok">${summary.tamamlandi}</span><span class="chart-stat-lbl">Tamamlandi</span></div>
+        <div class="chart-stat"><span class="chart-stat-val chart-val-wait">${summary.bekliyor}</span><span class="chart-stat-lbl">Bekliyor</span></div>
+    `;
+}
+
+function renderRepos(repos) {
+    const el = document.getElementById('chartRepos');
+    if (!repos || repos.length === 0) { el.innerHTML = ''; return; }
+    const maxVal = repos[0].count || 1;
+    let html = '<div class="chart-repos-title">Repo Dagilimi</div><div class="repo-stats">';
+    repos.forEach(r => {
+        const pct = Math.max((r.count / maxVal) * 100, 4);
+        html += `<a href="/repo-deployments?repo=${encodeURIComponent(r.name)}" class="repo-stat-row repo-stat-link">
+            <span class="repo-stat-name">${r.name}</span>
+            <div class="repo-stat-bar-wrap"><div class="repo-stat-bar" style="width:${pct}%"></div></div>
+            <span class="repo-stat-count">${r.count}</span>
+        </a>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function showBarDetail(idsStr, label) {
+    if (!idsStr) return;
+    const el = document.getElementById('chartDetail');
+    el.innerHTML = '<p class="empty-state">Yukleniyor...</p>';
+
+    fetch('/api/future-deployments/by-ids?ids=' + idsStr)
+        .then(r => r.json())
+        .then(items => {
+            if (!items.length) { el.innerHTML = ''; return; }
+            let html = `<div class="chart-detail-header"><h4>${label}</h4><button class="btn-icon" onclick="document.getElementById('chartDetail').innerHTML=''">&times;</button></div>`;
+            html += '<div class="chart-detail-list">';
+            items.forEach(fd => {
+                const statusCls = fd.status === 'tamamlandi' ? 'badge-fd-tamamlandi-sm' : 'badge-fd-bekliyor-sm';
+                const statusTxt = fd.status === 'tamamlandi' ? 'OK' : 'Bekliyor';
+                const repos = (fd.repos || []).map(r => r.name.split('/').pop()).join(', ');
+                html += `<a href="/deployment/${fd.id}" class="chart-detail-item">
+                    <span class="deploy-card-date">${fd.date}</span>
+                    <span class="badge ${statusCls}">${statusTxt}</span>
+                    <span class="badge badge-task">${fd.task}</span>
+                    <span class="chart-detail-title">${fd.title}</span>
+                    ${repos ? `<span class="chart-detail-repos">${repos}</span>` : ''}
+                </a>`;
+            });
+            html += '</div>';
+            el.innerHTML = html;
+        });
+}
+
+document.addEventListener('DOMContentLoaded', () => loadChart('month'));
+</script>
+{% endblock %}

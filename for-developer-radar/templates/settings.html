@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="settings-grid">
+    <div class="card">
+        <div class="card-header"><h3>Bildirim Ayarlari</h3></div>
+        <div class="form-group">
+            <label>Bildirim Saati</label>
+            <div class="form-row">
+                <input type="number" id="s_notification_hour" class="form-input" min="0" max="23" value="{{ settings.get('notification_hour', '9') }}">
+                <span class="form-separator">:</span>
+                <input type="number" id="s_notification_minute" class="form-input" min="0" max="59" value="{{ settings.get('notification_minute', '0') }}">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_deployment_reminder" {% if settings.get('deployment_reminder', 'true') == 'true' %}checked{% endif %}>
+                Deployment Hatirlatmasi (Sali & Persembe)
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_daily_note_reminder" {% if settings.get('daily_note_reminder', 'true') == 'true' %}checked{% endif %}>
+                Daily Note Hatirlatmasi
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_morning_briefing" {% if settings.get('morning_briefing', 'true') == 'true' %}checked{% endif %}>
+                Sabah Brifingi
+            </label>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Gorunum</h3></div>
+        <div class="form-group">
+            <label>Tema</label>
+            <select id="s_theme" class="form-input" onchange="applyTheme(this.value)">
+                <option value="dark" {% if settings.get('theme', 'dark') == 'dark' %}selected{% endif %}>Dark</option>
+                <option value="light" {% if settings.get('theme', 'dark') == 'light' %}selected{% endif %}>Light</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Sunucu Ayarlari</h3></div>
+        <div class="form-group">
+            <label>Port</label>
+            <input type="number" id="s_port" class="form-input" min="1024" max="65535" value="{{ settings.get('port', '5555') }}">
+            <p class="form-hint">Degisiklik uygulamak icin restart gerekir.</p>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+            <button class="btn btn-danger btn-sm" onclick="restartApp()">Uygulamayi Yeniden Baslat</button>
+            <p class="form-hint">Uygulama kapanir ve LaunchAgent tarafindan otomatik yeniden baslatilir.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Guvenlik</h3></div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_auth_required" {% if settings.get('auth_required', 'true') != 'false' %}checked{% endif %}>
+                Acilis Parolasini Iste (PIN)
+            </label>
+            <p class="form-hint">Kapatirsan uygulamayi acmak icin PIN sorulmaz. PIN dogrulama kodu yerinde durur — istediginde tekrar acabilirsin.</p>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+            <label>PIN Degistir</label>
+            <input type="password" id="s_new_pin" class="form-input" placeholder="Yeni PIN" style="max-width: 200px;">
+            <button class="btn btn-ghost btn-sm" onclick="changePin()" style="margin-top: 8px;">PIN Guncelle</button>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+            <a href="/logout" class="btn btn-danger btn-sm">Cikis Yap</a>
+            <p class="form-hint">Oturumu sonlandirir. Tekrar PIN ile giris gerekir.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Calisma Alani</h3></div>
+        <div class="form-group">
+            <label>Workspace Klasoru</label>
+            <input type="text" id="s_workspace_root" class="form-input" placeholder="{{ workspace_info.default_root }}"
+                   value="{{ settings.get('workspace_root', '') }}">
+            <p class="form-hint">
+                .md dosyalari ve git repolari bu klasor altinda taranir. Bos birakirsan varsayilan kullanilir.<br>
+                <strong>Suanki:</strong> <code>{{ workspace_info.current_root }}</code>
+            </p>
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+            <label>Deployment Log Yolu (opsiyonel)</label>
+            <input type="text" id="s_deployment_log_path" class="form-input" placeholder="{{ workspace_info.default_deployment_log }}"
+                   value="{{ settings.get('deployment_log_path', '') }}">
+            <p class="form-hint">
+                Bos ise <code>{workspace}/DEPLOYMENT_LOG.md</code> kullanilir. Farkli isim/konum varsa burada belirt.<br>
+                <strong>Suanki:</strong> <code>{{ workspace_info.current_deployment_log }}</code>
+            </p>
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+            <button class="btn btn-ghost btn-sm" onclick="rescanWorkspace()">Yeniden Tara &amp; Cikar</button>
+            <p class="form-hint">Md indexini sifirlayip yeni klasorden tarar, DEPLOYMENT_LOG kayitlarini parse eder.</p>
+        </div>
+    </div>
+
+    <div class="card settings-anim-card">
+        <div class="card-header"><h3>Animasyonlar</h3></div>
+        <div class="form-group">
+            <label>Genel Yogunluk</label>
+            <select id="s_anim_mode" class="form-input">
+                {% set m = anim_settings.get('anim_mode', 'high') %}
+                <option value="high"   {% if m == 'high'   %}selected{% endif %}>Yuksek (varsayilan)</option>
+                <option value="medium" {% if m == 'medium' %}selected{% endif %}>Orta (idle pulse'lari yavaslatir)</option>
+                <option value="low"    {% if m == 'low'    %}selected{% endif %}>Dusuk (idle/decorative animasyonlari kapatir)</option>
+                <option value="off"    {% if m == 'off'    %}selected{% endif %}>Kapali (tum animasyon ve gecisleri durdurur)</option>
+            </select>
+            <p class="form-hint">"Kapali" tum animasyonlari ve CSS transition'larini durdurur; "Dusuk" yalnizca dekoratif/idle olanlari kapatir.</p>
+        </div>
+
+        <div class="form-row" style="flex-wrap: wrap; gap: 18px; margin-top: 8px;">
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_anim_splash" {% if anim_settings.get('anim_splash', 'true') == 'true' %}checked{% endif %}>
+                Splash Ekrani
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_anim_transitions" {% if anim_settings.get('anim_transitions', 'true') == 'true' %}checked{% endif %}>
+                Sayfa Gecis Overlay'i
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_anim_page_boot" {% if anim_settings.get('anim_page_boot', 'true') == 'true' %}checked{% endif %}>
+                Sayfa Boot Overlay'i
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_anim_page_reveal" {% if anim_settings.get('anim_page_reveal', 'true') == 'true' %}checked{% endif %}>
+                Element Reveal Animasyonu
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_anim_docs_scan" {% if anim_settings.get('anim_docs_scan', 'true') == 'true' %}checked{% endif %}>
+                Docs Scan Overlay'i
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="s_anim_idle_pulse" {% if anim_settings.get('anim_idle_pulse', 'true') == 'true' %}checked{% endif %}>
+                Idle Pulse'lar (notif, kritik task)
+            </label>
+        </div>
+
+        <div class="form-group" style="margin-top: 18px;">
+            <label>Splash Tekrar Araligi (dakika)</label>
+            <input type="number" id="s_anim_splash_interval_min" class="form-input" min="0" max="1440" style="max-width: 160px;" value="{{ anim_settings.get('anim_splash_interval_min', '30') }}">
+            <p class="form-hint">Ayni session icinde splash bu sure gecmeden tekrar gosterilmez. 0 = her sayfa yuklemede goster.</p>
+        </div>
+
+        <div class="form-group" style="margin-top: 12px;">
+            <label>Sayfa Gecis Olasiligi (%)</label>
+            <input type="number" id="s_anim_transition_chance" class="form-input" min="0" max="100" style="max-width: 160px;" value="{{ anim_settings.get('anim_transition_chance', '45') }}">
+            <p class="form-hint">Sidebar tiklamalarinin yuzde kacinda matrix gecis overlay'i acilsin.</p>
+        </div>
+
+        <div class="form-group" style="margin-top: 18px;">
+            <label>Bu Ekranlarda Animasyon Kapali Olsun</label>
+            <div class="anim-page-grid">
+                {% for path, label in anim_pages %}
+                <label class="checkbox-label">
+                    <input type="checkbox" class="anim-page-cb" data-path="{{ path }}" {% if path in anim_pages_off %}checked{% endif %}>
+                    {{ label }}
+                    <span class="form-path-hint">{{ path }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <p class="form-hint">Isaretli ekranlar icinde tum sayfa animasyonlari (splash, gecis, boot, reveal, docs scan) ve CSS transition'lar devre disi olur.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Veri Yonetimi</h3></div>
+        <div class="form-group">
+            <button class="btn btn-primary" onclick="rebuildIndex()">Md Index Yeniden Olustur</button>
+            <p class="form-hint">Tum .md dosyalarini tarar ve arama indexini gunceller.</p>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+            <button class="btn btn-ghost" onclick="refreshGitPulse()">Git Analizini Yenile</button>
+            <p class="form-hint">Git Pulse cache'ini tazeleyip team hareketini tekrar hesaplar.</p>
+        </div>
+    </div>
+</div>
+
+<div class="settings-save">
+    <button class="btn btn-primary btn-lg" onclick="saveAllSettings()">Ayarlari Kaydet</button>
+</div>
+
+<div class="index-terminal" id="indexTerminal">
+    <div class="index-terminal-window">
+        <div class="index-terminal-head">
+            <span>Indexing Terminal</span>
+            <button class="btn-icon" onclick="closeIndexTerminal()">&times;</button>
+        </div>
+        <div class="index-terminal-body" id="indexTerminalBody"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function saveAllSettings() {
+    const pagesOff = Array.from(document.querySelectorAll('.anim-page-cb'))
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.path)
+        .join(',');
+
+    const data = {
+        notification_hour: document.getElementById('s_notification_hour').value,
+        notification_minute: document.getElementById('s_notification_minute').value,
+        theme: document.getElementById('s_theme').value,
+        deployment_reminder: document.getElementById('s_deployment_reminder').checked ? 'true' : 'false',
+        daily_note_reminder: document.getElementById('s_daily_note_reminder').checked ? 'true' : 'false',
+        morning_briefing: document.getElementById('s_morning_briefing').checked ? 'true' : 'false',
+        port: document.getElementById('s_port').value,
+        auth_required: document.getElementById('s_auth_required').checked ? 'true' : 'false',
+        workspace_root: document.getElementById('s_workspace_root').value.trim(),
+        deployment_log_path: document.getElementById('s_deployment_log_path').value.trim(),
+        anim_mode: document.getElementById('s_anim_mode').value,
+        anim_splash: document.getElementById('s_anim_splash').checked ? 'true' : 'false',
+        anim_transitions: document.getElementById('s_anim_transitions').checked ? 'true' : 'false',
+        anim_page_boot: document.getElementById('s_anim_page_boot').checked ? 'true' : 'false',
+        anim_page_reveal: document.getElementById('s_anim_page_reveal').checked ? 'true' : 'false',
+        anim_docs_scan: document.getElementById('s_anim_docs_scan').checked ? 'true' : 'false',
+        anim_idle_pulse: document.getElementById('s_anim_idle_pulse').checked ? 'true' : 'false',
+        anim_splash_interval_min: document.getElementById('s_anim_splash_interval_min').value || '30',
+        anim_transition_chance: document.getElementById('s_anim_transition_chance').value || '0',
+        anim_pages_off: pagesOff,
+    };
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+        if (d.rescanned && d.summary) {
+            showToast('Ayarlar kaydedildi · ' + d.summary.indexed + ' md taradi');
+        } else {
+            showToast('Ayarlar kaydedildi');
+        }
+        setTimeout(() => location.reload(), 700);
+    });
+}
+
+function rescanWorkspace() {
+    openIndexTerminal();
+    appendIndexLine('> resetting md index ...');
+    appendIndexLine('> scanning workspace from current root ...');
+    fetch('/api/workspace/rescan', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            if (!d.ok) {
+                appendIndexLine('  [ERR] ' + (d.error || 'rescan failed'));
+                return;
+            }
+            const s = d.summary || {};
+            appendIndexLine('> rescan finished');
+            appendIndexLine(`  [OK] ${s.indexed||0} dosya | +${s.added||0} yeni | ~${s.updated||0} guncel | -${s.removed||0} silindi`);
+            (s.sample_files || []).forEach(p => appendIndexLine('  -> ' + p));
+            showToast(`${s.indexed||0} dosya taradi`);
+        })
+        .catch(() => appendIndexLine('  [ERR] rescan failed'));
+}
+
+function rebuildIndex() {
+    openIndexTerminal();
+    appendIndexLine('> scanning workspace markdown surface ...');
+    appendIndexLine('> reading task, deployment and guide files ...');
+    fetch('/api/index/rebuild', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            appendIndexLine('> rebuild finished');
+            appendIndexLine(`  [OK] ${d.indexed} dosya indexlendi | +${d.added} yeni | ~${d.updated} guncel | -${d.removed} silindi`);
+            (d.sample_files || []).forEach(path => appendIndexLine('  -> ' + path));
+            showToast(d.indexed + ' dosya indexlendi');
+        })
+        .catch(() => appendIndexLine('  [ERR] index rebuild basarisiz'));
+}
+
+function refreshGitPulse() {
+    openIndexTerminal();
+    appendIndexLine('> warming git pulse cache ...');
+    fetch('/api/team-pulse?refresh=1')
+        .then(r => r.json())
+        .then(d => {
+            appendIndexLine('> git pulse refreshed');
+            appendIndexLine(`  [OK] ${d.summary.active_repos} aktif repo | ${d.summary.commits_24h} commit / 24h | ${d.summary.merge_count} merge`);
+            if (typeof loadGitPulseWidget === 'function') loadGitPulseWidget(true);
+            showToast('Git Pulse yenilendi');
+        })
+        .catch(() => appendIndexLine('  [ERR] git pulse refresh basarisiz'));
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+}
+
+function changePin() {
+    const pin = document.getElementById('s_new_pin').value;
+    if (!pin || pin.length < 4) { showToast('PIN en az 4 karakter olmali'); return; }
+    fetch('/api/change-pin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pin: pin})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            showToast('PIN guncellendi');
+            document.getElementById('s_new_pin').value = '';
+        } else {
+            showToast(d.error || 'Hata');
+        }
+    });
+}
+
+function restartApp() {
+    if (!confirm('Uygulama yeniden baslatilacak. Devam edilsin mi?')) return;
+    fetch('/api/restart', {method: 'POST'})
+        .then(() => {
+            showToast('Uygulama yeniden baslatiliyor...');
+            setTimeout(() => {
+                const port = document.getElementById('s_port').value || '5555';
+                window.location.href = 'http://127.0.0.1:' + port + '/settings';
+            }, 3000);
+        })
+        .catch(() => {
+            showToast('Restart baslatildi, sayfa yeniden yukleniyor...');
+            setTimeout(() => location.reload(), 3000);
+        });
+}
+
+function openIndexTerminal() {
+    const modal = document.getElementById('indexTerminal');
+    const body = document.getElementById('indexTerminalBody');
+    body.innerHTML = '';
+    modal.classList.add('open');
+}
+
+function appendIndexLine(text) {
+    const body = document.getElementById('indexTerminalBody');
+    const line = document.createElement('div');
+    line.className = 'index-terminal-line';
+    line.textContent = text;
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+}
+
+function closeIndexTerminal() {
+    document.getElementById('indexTerminal').classList.remove('open');
+}
+</script>
+{% endblock %}

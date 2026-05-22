@@ -32,6 +32,12 @@ fordeveloper/com.odeal.fordeveloper.plist
 fordeveloper/*.log
 fordeveloper/*.pid
 
+# ─── delivery radar runtime data (DB, logs, secrets) ────
+for-developer-radar/data/
+for-developer-radar/*.log
+for-developer-radar/*.pid
+for-developer-radar/.hub_logs/
+
 # ─── clipboard-keeper runtime logs ──────────────────────
 clipboard-keeper/clipboard-keeper.log
 clipboard-keeper/launchd.out.log

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Delivery Radar{% endblock %}
+{% block page_title %}Delivery Radar{% endblock %}
+
+{% block content %}
+<div class="delivery-radar-hero">
+    <div>
+        <h2>Git + Jira + Deployment Eslesmesi</h2>
+        <p>Finance workspace icindeki local git gecmisini deployment notlariyla eslestirir; PR, dosya etkisi, test branch ve pipeline sinyallerini tek akista gosterir.</p>
+    </div>
+    <div class="delivery-radar-controls">
+        <input type="text" id="deliveryRadarQuery" class="form-input" placeholder="repo, TCO/Jira key veya dosya yolu">
+        <select id="deliveryRadarDays" class="form-input">
+            <option value="30">30 gun</option>
+            <option value="60" selected>60 gun</option>
+            <option value="90">90 gun</option>
+            <option value="180">180 gun</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadDeliveryRadar(true)">Yenile</button>
+    </div>
+</div>
+
+<div class="team-pulse-summary" id="deliveryRadarSummary">
+    <div class="status-card"><div class="status-info"><span class="status-label">Yukleniyor</span><span class="status-value">...</span></div></div>
+</div>
+
+<div class="dashboard-grid delivery-radar-grid">
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3>Deployment Gunleri</h3>
+        </div>
+        <div id="deliveryRadarDaysList">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Pipeline / Test Uyarilari</h3>
+        </div>
+        <div id="deliveryRadarWarnings">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+
+    <div class="card card-wide">
+        <div class="card-header">
+            <h3>PR / Jira Eslesmeleri</h3>
+        </div>
+        <div id="deliveryRadarPrs">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Dosya Etkisi</h3>
+        </div>
+        <div id="deliveryRadarPaths">
+            <p class="empty-state">Veri yukleniyor...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function drEscape(value) {
+    if (typeof escapeHtml === 'function') return escapeHtml(value);
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+}
+
+function loadDeliveryRadar(forceRefresh = false) {
+    const summaryEl = document.getElementById('deliveryRadarSummary');
+    if (!summaryEl) return;
+
+    const q = document.getElementById('deliveryRadarQuery').value.trim();
+    const days = document.getElementById('deliveryRadarDays').value;
+    const params = new URLSearchParams({days});
+    if (q) params.set('q', q);
+    if (forceRefresh) params.set('refresh', '1');
+
+    summaryEl.innerHTML = '<div class="status-card"><div class="status-info"><span class="status-label">Taranıyor</span><span class="status-value">...</span></div></div>';
+
+    fetch(`/api/delivery-radar?${params.toString()}`)
+        .then(r => r.json())
+        .then(data => {
+            renderDeliveryRadar(data);
+            if (forceRefresh && typeof showToast === 'function') showToast('Delivery Radar yenilendi');
+        })
+        .catch(() => {
+            summaryEl.innerHTML = '<div class="status-card"><div class="status-info"><span class="status-label">Hata</span><span class="status-value">!</span></div></div>';
+        });
+}
+
+function renderDeliveryRadar(data) {
+    const summary = data.summary || {};
+    document.getElementById('deliveryRadarSummary').innerHTML = `
+        <div class="status-card"><div class="status-info"><span class="status-label">Repo</span><span class="status-value">${summary.repo_count || 0}</span></div></div>
+        <div class="status-card"><div class="status-info"><span class="status-label">Deployment</span><span class="status-value">${summary.deployment_count || 0}</span></div></div>
+        <div class="status-card"><div class="status-info"><span class="status-label">Eslesen PR</span><span class="status-value">${summary.matched_pr_count || 0}</span></div></div>
+        <div class="status-card"><div class="status-info"><span class="status-label">Jira'li PR</span><span class="status-value">${summary.jira_linked_pr_count || 0}</span></div></div>
+        <div class="status-card"><div class="status-info"><span class="status-label">Test Teyidi</span><span class="status-value">${summary.test_pending_count || 0}</span></div></div>
+        <div class="status-card"><div class="status-info"><span class="status-label">Pipeline Sinyali</span><span class="status-value">${summary.pipeline_signal_count || 0}</span></div></div>
+    `;
+
+    document.getElementById('deliveryRadarDaysList').innerHTML = renderDeploymentDays(data.deployment_days || []);
+    document.getElementById('deliveryRadarWarnings').innerHTML = renderDeliveryWarnings(data.pipeline_items || []);
+    document.getElementById('deliveryRadarPrs').innerHTML = renderDeliveryPrs(data.prs || []);
+    document.getElementById('deliveryRadarPaths').innerHTML = renderDeliveryPaths(data.path_hotspots || []);
+}
+
+function renderDeploymentDays(days) {
+    if (!days.length) return '<p class="empty-state">Deployment kaydi bulunamadi. Settings > Calisma Alani icinden deployment log yolunu kontrol et.</p>';
+    return days.map(day => `
+        <div class="delivery-day-row">
+            <div class="delivery-day-head">
+                <strong>${drEscape(day.date)}</strong>
+                <span>${day.deployment_count} deploy • ${day.matched_pr_count} PR • ${day.pending_test_count} test teyidi</span>
+            </div>
+            <div class="delivery-day-items">
+                ${(day.items || []).slice(0, 5).map(item => `
+                    <a href="/deployment/${item.id}" class="delivery-deploy-chip">
+                        <span>${drEscape(item.task || 'NO-JIRA')}</span>
+                        <em>${drEscape(item.title)}</em>
+                    </a>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderDeliveryWarnings(items) {
+    if (!items.length) return '<p class="empty-state">Pipeline/test uyarisi yok. Canli GitLab entegrasyonu eklenince failed job detaylari burada listelenir.</p>';
+    return items.map(item => `
+        <a class="delivery-warning-row ${drEscape(item.severity)}" href="${item.href || '#'}" ${item.href ? 'target="_blank"' : ''}>
+            <strong>${drEscape(item.title)}</strong>
+            <span>${drEscape(item.text)}</span>
+        </a>
+    `).join('');
+}
+
+function renderDeliveryPrs(prs) {
+    if (!prs.length) return '<p class="empty-state">Filtreyle eslesen PR/MR bulunamadi.</p>';
+    return prs.slice(0, 30).map(pr => {
+        const risk = pr.risk || {};
+        const keys = (pr.jira_keys || []).length ? pr.jira_keys.join(', ') : 'NO-JIRA';
+        const deployText = (pr.deployments || []).map(d => d.task || d.title).join(', ');
+        return `
+            <div class="delivery-pr-row risk-${drEscape(risk.severity || 'low')}">
+                <div class="delivery-pr-main">
+                    <div class="delivery-pr-title">
+                        ${pr.mr_url ? `<a href="${pr.mr_url}" target="_blank">${drEscape(pr.title)}</a>` : drEscape(pr.title)}
+                    </div>
+                    <div class="delivery-pr-meta">
+                        <span>${drEscape(pr.repo_slug)}</span>
+                        <span>${drEscape(keys)}</span>
+                        <span>${pr.file_count || 0} dosya</span>
+                        <span>+${pr.additions || 0} / -${pr.deletions || 0}</span>
+                        <span>${drEscape(pr.test_branch_state?.label || '-')}</span>
+                    </div>
+                    ${deployText ? `<div class="delivery-pr-deploy">Deploy: ${drEscape(deployText)}</div>` : ''}
+                    ${(risk.reasons || []).length ? `<div class="delivery-risk-reasons">${risk.reasons.map(drEscape).join(' • ')}</div>` : ''}
+                </div>
+                <div class="delivery-risk-score">
+                    <span>${risk.score || 0}</span>
+                    <em>${drEscape(risk.severity || 'low')}</em>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderDeliveryPaths(paths) {
+    if (!paths.length) return '<p class="empty-state">Dosya etkisi bulunamadi.</p>';
+    return paths.slice(0, 20).map(item => `
+        <div class="delivery-path-row">
+            <div>
+                <strong>${drEscape(item.path)}</strong>
+                <span>${drEscape(item.repo)} • ${item.touch_count} PR • ${(item.jira_keys || []).join(', ') || 'NO-JIRA'}</span>
+            </div>
+            ${item.risk_count ? `<em>${item.risk_count} risk</em>` : ''}
+        </div>
+    `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDeliveryRadar(false);
+    const input = document.getElementById('deliveryRadarQuery');
+    if (input) {
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') loadDeliveryRadar(false);
+        });
+    }
+});
+</script>
+{% endblock %}
