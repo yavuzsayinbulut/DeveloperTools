@@ -150,27 +150,47 @@ class AppManager:
 
     def stop_app(self, app: DiscoveredApp) -> tuple[bool, str]:
         runtime = self.get_runtime(app)
+        if app.stop_script:
+            ok, message = self._run_stop_script(app, runtime)
+            if ok:
+                return ok, message
+
         if runtime.pid and is_pid_running(runtime.pid):
             if terminate_pid(runtime.pid):
                 self.state.patch_runtime(app.key, pid=None)
                 return True, "Durdurma sinyali gonderildi."
 
-        if app.stop_script:
-            try:
-                subprocess.Popen(
-                    ["/bin/zsh", "stop.command"],
-                    cwd=app.path,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-                self.state.patch_runtime(app.key, pid=None)
-                return True, "Stop script calistirildi."
-            except Exception as exc:
-                return False, str(exc)
-
         return False, "Calisan surec bulunamadi."
+
+    def _run_stop_script(
+        self,
+        app: DiscoveredApp,
+        runtime: RuntimeState,
+    ) -> tuple[bool, str]:
+        try:
+            subprocess.run(
+                ["/bin/zsh", "stop.command"],
+                cwd=app.path,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                timeout=6,
+                check=False,
+            )
+        except Exception as exc:
+            return False, str(exc)
+
+        if runtime.pid:
+            deadline = time.time() + 3.0
+            while time.time() < deadline:
+                if not is_pid_running(runtime.pid):
+                    self.state.patch_runtime(app.key, pid=None)
+                    return True, "Stop script calistirildi."
+                time.sleep(0.15)
+
+        self.state.patch_runtime(app.key, pid=None)
+        return True, "Stop script calistirildi."
 
     def restart_app(self, app: DiscoveredApp) -> tuple[bool, str]:
         stop_ok, stop_message = self.stop_app(app)

@@ -211,6 +211,30 @@ def find_pids_by_path(app_path: str, entrypoints: tuple[str, ...] = ("main.py", 
     if pids:
         return sorted(pids)
 
+    for bundle_executable in Path(abs_app_path).glob("dist/*.app/Contents/MacOS/*"):
+        if not bundle_executable.is_file():
+            continue
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", str(bundle_executable)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except Exception:
+            continue
+        for line in result.stdout.split():
+            value = line.strip()
+            if not value.isdigit():
+                continue
+            value_int = int(value)
+            if value_int == own_pid:
+                continue
+            pids.add(value_int)
+
+    if pids:
+        return sorted(pids)
+
     # Fallback: a process may have argv like "Python main.py" with the app
     # directory as cwd (typical for shell scripts that `cd` before exec).
     # We scan any python invoking main.py / app.py and match via lsof cwd.

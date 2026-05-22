@@ -11,6 +11,8 @@ cati uygulama.
 - URL varsa tarayicida acar
 - Klasoru ve loglari acar
 - URL bilgisini duzenleyip kaydeder
+- Uygulamalari ToolHub listesinden gizler, gizlenenleri tekrar gorunur yapar
+- Secili veya gizlenen uygulamayi URL/pencere acmadan arka planda baslatir
 - Calisan surecin durumunu takip eder
 
 ## Calistirma

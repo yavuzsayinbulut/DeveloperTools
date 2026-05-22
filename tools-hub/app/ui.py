@@ -654,6 +654,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.state = state
         self.manager = manager
+        self.all_apps: List[DiscoveredApp] = []
         self.apps: List[DiscoveredApp] = []
         self.selected_key = self.state.get_window().get("selected_key", "")
         self.force_quit = False
@@ -771,6 +772,12 @@ class MainWindow(QMainWindow):
         rescan_btn.setCursor(Qt.PointingHandCursor)
         rescan_btn.clicked.connect(self.refresh_apps)
         layout.addWidget(rescan_btn)
+
+        hidden_btn = QPushButton("  Gizlenenleri Yönet")
+        hidden_btn.setObjectName("SidebarAction")
+        hidden_btn.setCursor(Qt.PointingHandCursor)
+        hidden_btn.clicked.connect(self.manage_hidden_apps)
+        layout.addWidget(hidden_btn)
 
         tools_button = QToolButton()
         tools_button.setObjectName("SidebarToolMenu")
@@ -974,6 +981,10 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self.start_selected_app)
         lifecycle_row.addWidget(self.start_button)
 
+        self.hidden_start_button = QPushButton("Gizli Başlat")
+        self.hidden_start_button.clicked.connect(self.start_selected_app_hidden)
+        lifecycle_row.addWidget(self.hidden_start_button)
+
         self.stop_button = QPushButton("Durdur")
         self.stop_button.setObjectName("DangerButton")
         self.stop_button.clicked.connect(self.stop_selected_app)
@@ -1003,6 +1014,10 @@ class MainWindow(QMainWindow):
         self.open_folder_button = QPushButton("Klasör")
         self.open_folder_button.clicked.connect(self.open_selected_folder)
         access_row.addWidget(self.open_folder_button)
+
+        self.hide_app_button = QPushButton("Listeden Gizle")
+        self.hide_app_button.clicked.connect(self.hide_selected_app)
+        access_row.addWidget(self.hide_app_button)
 
         self.open_logs_button = QPushButton("Loglar")
         self.open_logs_button.clicked.connect(self.open_selected_logs)
@@ -1169,9 +1184,16 @@ class MainWindow(QMainWindow):
         QApplication.instance().quit()
 
     def refresh_apps(self) -> None:
-        self.apps = discover_apps()
+        self.all_apps = discover_apps()
+        self.apps = [
+            app for app in self.all_apps if not self.state.is_app_hidden(app.key)
+        ]
         if self.apps and not any(app.key == self.selected_key for app in self.apps):
             self.selected_key = self.apps[0].key
+            self.state.update_window(selected_key=self.selected_key)
+        elif not self.apps:
+            self.selected_key = ""
+            self.state.update_window(selected_key="")
         self.refresh_app_list()
         self.refresh_details()
         if hasattr(self, "tray_menu"):
@@ -1218,8 +1240,13 @@ class MainWindow(QMainWindow):
 
         self.list_layout.addStretch()
         total = len(self.apps)
+        hidden_count = len(self.hidden_apps())
+        total_discovered = len(self.all_apps)
+        hidden_suffix = f"  ·  {hidden_count} gizli" if hidden_count else ""
         self.summary_label.setText(
-            f"{running_count} aktif  ·  {total} uygulama" if total else "Henüz uygulama yok"
+            f"{running_count} aktif  ·  {total} görünür{hidden_suffix}"
+            if total_discovered
+            else "Henüz uygulama yok"
         )
         if hasattr(self, "list_count_label"):
             self.list_count_label.setText(f"{len(visible_apps)}/{total}")
@@ -1249,6 +1276,17 @@ class MainWindow(QMainWindow):
             self.status_badge.setObjectName("BadgeGray")
             self.status_badge.style().unpolish(self.status_badge)
             self.status_badge.style().polish(self.status_badge)
+            self.open_button.setEnabled(False)
+            self.start_button.setEnabled(False)
+            self.hidden_start_button.setEnabled(False)
+            self.stop_button.setEnabled(False)
+            self.restart_button.setEnabled(False)
+            self.open_url_button.setEnabled(False)
+            self.open_terminal_button.setEnabled(False)
+            self.hide_app_button.setEnabled(False)
+            self.open_logs_button.setEnabled(False)
+            self.open_readme_button.setEnabled(False)
+            self.health_check_button.setEnabled(False)
             return
 
         runtime = self.manager.get_runtime(app)
@@ -1295,8 +1333,13 @@ class MainWindow(QMainWindow):
         self.open_button.setEnabled(bool(app.start_command) or bool(resolved_url))
         self.stop_button.setEnabled(running or bool(app.stop_script))
         self.restart_button.setEnabled(bool(app.start_command) or bool(app.stop_script))
+        self.hidden_start_button.setEnabled(
+            bool(app.start_command) and not running and not reachable
+        )
         self.open_url_button.setEnabled(bool(resolved_url))
         self.open_terminal_button.setEnabled(True)
+        self.hide_app_button.setEnabled(True)
+        self.open_logs_button.setEnabled(True)
         self.health_check_button.setEnabled(True)
         self.open_readme_button.setEnabled(bool(app.readme_path))
 
@@ -1343,6 +1386,102 @@ class MainWindow(QMainWindow):
         if not ok:
             QMessageBox.warning(self, "Start Hatasi", message)
         self.refresh_runtime_state()
+
+    def start_selected_app_hidden(self) -> None:
+        app = self.get_selected_app()
+        if not app:
+            return
+        self._start_app_hidden(app)
+
+    def _start_app_hidden(self, app: DiscoveredApp) -> None:
+        if self.launching.get(app.key):
+            self.status_bar.showMessage("Bu uygulama zaten baslatiliyor.", 2500)
+            return
+        if self.manager.is_app_running(app):
+            self.status_bar.showMessage("Uygulama zaten calisiyor.", 2500)
+            self.refresh_runtime_state()
+            return
+
+        ok, message = self.manager.start_app(app)
+        if ok:
+            self.status_bar.showMessage(f"{app.name} arka planda baslatildi.", 3500)
+        else:
+            self.status_bar.showMessage(message, 3500)
+            QMessageBox.warning(self, "Gizli Baslatma Hatasi", message)
+        self.refresh_runtime_state()
+
+    def hide_selected_app(self) -> None:
+        app = self.get_selected_app()
+        if not app:
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Uygulamayi Gizle",
+            f"{app.name} ToolHub listesinden gizlensin mi?\n\n"
+            "Uygulama durdurulmaz; sadece ana liste ve menubar menusunden saklanir.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        self.state.set_app_hidden(app.key, True)
+        self.status_bar.showMessage(f"{app.name} gizlendi.", 3500)
+        self.refresh_apps()
+
+    def hidden_apps(self) -> List[DiscoveredApp]:
+        return [
+            app for app in self.all_apps if self.state.is_app_hidden(app.key)
+        ]
+
+    def manage_hidden_apps(self) -> None:
+        hidden_apps = self.hidden_apps()
+        if not hidden_apps:
+            QMessageBox.information(
+                self,
+                "Gizlenen Uygulamalar",
+                "Gizlenen uygulama yok.",
+            )
+            return
+
+        choices = {
+            f"{app.name}  ({app.metadata.get('folder_name', Path(app.path).name)})": app
+            for app in hidden_apps
+        }
+        selected_label, accepted = QInputDialog.getItem(
+            self,
+            "Gizlenen Uygulamalar",
+            "Islem yapilacak uygulama:",
+            list(choices.keys()),
+            0,
+            False,
+        )
+        if not accepted or not selected_label:
+            return
+
+        app = choices[selected_label]
+        box = QMessageBox(self)
+        box.setWindowTitle("Gizlenen Uygulama")
+        box.setText(app.name)
+        box.setInformativeText(
+            "Gizlilikten cikarirsan ana listede tekrar gorunur. "
+            "Gizli baslatma URL veya pencere acmaz."
+        )
+        unhide_button = box.addButton("Gizlilikten Çıkar", QMessageBox.AcceptRole)
+        start_button = box.addButton("Gizli Başlat", QMessageBox.ActionRole)
+        box.addButton("Vazgeç", QMessageBox.RejectRole)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked == unhide_button:
+            self.state.set_app_hidden(app.key, False)
+            self.selected_key = app.key
+            self.state.update_window(selected_key=app.key)
+            self.refresh_apps()
+            self.status_bar.showMessage(f"{app.name} tekrar gorunur yapildi.", 3500)
+        elif clicked == start_button:
+            self._start_app_hidden(app)
 
     def start_all_apps(self) -> None:
         if not self.apps:

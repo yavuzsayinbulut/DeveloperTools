@@ -18,6 +18,7 @@ lokalde tutulur.
 | Arac | Tip | Ne ise yarar |
 |------|-----|--------------|
 | [tools-hub](#tools-hub) | PySide6 desktop | Bu repodaki araclari tek pencereden baslat, durdur, URL ac, log incele, PID/port kill yap |
+| [display-agent](#display-agent) | Swift menubar | Menubar'da sessiz calisan display session ve input activity yardimcisi |
 | [window-pinner-menubar](#window-pinner-menubar) | Swift menubar | Aktif macOS penceresini hotkey ile hep ustte tut, sonra normal gibi tasi ve yeniden boyutlandir |
 
 ```
@@ -25,6 +26,7 @@ Tools/
 ├── start.command            # tools-hub launcher'i acar
 ├── stop.command
 ├── tools-hub/               # arac yoneticisi
+├── display-agent/           # display session yardimcisi
 ├── window-pinner-menubar/   # aktif pencereyi ustte tutan macOS yardimci araci
 ├── clipboard-keeper/        # menubar clipboard manager
 └── fordeveloper/            # workspace dashboard (Flask)
@@ -71,6 +73,25 @@ Tools klasorunu tarayan, alt klasorlerdeki `start.command` / `app.py` /
 ```
 
 Durum dosyasi: `~/Library/Application Support/ToolsHub/state.json`
+
+---
+
+## display-agent
+
+Menubar'da calisan, Dock'ta gorunmeyen kucuk bir display session yardimcisi.
+
+**Ozellikler:**
+
+- Display session durumunu tek menubar ikonundan acip kapatir
+- Input activity'yi `Slow / Normal / Fast` hizlarinda yonetir
+- macOS'in izin verdigi kapali kapak kosullarinda normal akisi surdurur
+
+**Calistirma:**
+
+```bash
+cd display-agent
+./start.command
+```
 
 ---
 

@@ -16,6 +16,7 @@ class HubState:
         return {
             "apps": {},
             "window": {"geometry": None, "selected_key": ""},
+            "hidden_apps": [],
             "projects": [],
             "projects_window": {"selected_key": ""},
         }
@@ -33,6 +34,7 @@ class HubState:
         merged.update(payload)
         merged["apps"] = payload.get("apps", {})
         merged["window"] = {**merged["window"], **payload.get("window", {})}
+        merged["hidden_apps"] = payload.get("hidden_apps", [])
         merged["projects"] = payload.get("projects", [])
         merged["projects_window"] = {
             **merged["projects_window"],
@@ -70,6 +72,21 @@ class HubState:
 
     def get_window(self) -> Dict[str, Any]:
         return self.state.get("window", {})
+
+    def get_hidden_apps(self) -> list[str]:
+        return list(self.state.get("hidden_apps", []))
+
+    def is_app_hidden(self, app_key: str) -> bool:
+        return app_key in set(self.get_hidden_apps())
+
+    def set_app_hidden(self, app_key: str, hidden: bool) -> None:
+        hidden_apps = set(self.get_hidden_apps())
+        if hidden:
+            hidden_apps.add(app_key)
+        else:
+            hidden_apps.discard(app_key)
+        self.state["hidden_apps"] = sorted(hidden_apps)
+        self.save()
 
     def get_projects(self) -> list[Dict[str, Any]]:
         return list(self.state.get("projects", []))

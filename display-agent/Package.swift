@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "KeepAwake",
+    name: "DisplayAgent",
     platforms: [
         .macOS(.v13),
     ],
     products: [
-        .executable(name: "KeepAwake", targets: ["KeepAwake"]),
+        .executable(name: "DisplayAgent", targets: ["DisplayAgent"]),
     ],
     targets: [
         .executableTarget(
-            name: "KeepAwake",
-            path: "Sources/KeepAwake"
+            name: "DisplayAgent",
+            path: "Sources/DisplayAgent"
         ),
     ]
 )

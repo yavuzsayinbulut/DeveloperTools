@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build/release"
-APP_NAME="KeepAwake"
+APP_NAME="DisplayAgent"
 APP_DIR="$ROOT_DIR/dist/$APP_NAME.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RESOURCES_DIR="$APP_DIR/Contents/Resources"
@@ -26,13 +26,13 @@ cat > "$PLIST_PATH" <<'PLIST'
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>KeepAwake</string>
+    <string>DisplayAgent</string>
     <key>CFBundleIdentifier</key>
-    <string>local.keepawake.menubar</string>
+    <string>local.display.agent</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>KeepAwake</string>
+    <string>Display Agent</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

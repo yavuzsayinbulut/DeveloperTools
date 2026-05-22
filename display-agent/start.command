@@ -2,8 +2,8 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_BUNDLE="$APP_DIR/dist/KeepAwake.app"
-APP_BIN="$APP_BUNDLE/Contents/MacOS/KeepAwake"
+APP_BUNDLE="$APP_DIR/dist/DisplayAgent.app"
+APP_BIN="$APP_BUNDLE/Contents/MacOS/DisplayAgent"
 BUILD_SCRIPT="$APP_DIR/Scripts/build-app.sh"
 
 needs_build=0
@@ -19,6 +19,11 @@ fi
 
 if [ "$needs_build" -eq 1 ]; then
   "$BUILD_SCRIPT" >/dev/null
+fi
+
+if pgrep -f "$APP_BIN" >/dev/null 2>&1; then
+  echo "Display Agent zaten calisiyor."
+  exit 0
 fi
 
 exec "$APP_BIN"

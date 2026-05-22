@@ -16,6 +16,7 @@ run() {
 
 run "Deployment Tracking"  "$ROOT_DIR/fordeveloper/stop.command"
 run "Clipboard Keeper"     "$ROOT_DIR/clipboard-keeper/stop.command"
+run "Display Agent"        "$ROOT_DIR/display-agent/stop.command"
 
 echo "[stop] Tools Hub"
 pkill -f "$ROOT_DIR/tools-hub/main.py" || true
